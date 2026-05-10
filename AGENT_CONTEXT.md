@@ -14,7 +14,7 @@
 
 **No standalone HTTP backend server.** All LLM traffic is Electron main → CLōD (or Mock).
 
-**Legacy / unused in main flow:** `renderer/mock-*.html` (old dual-shell experiment) is not registered by the main process; IPC channels for that shell were removed.
+**Removed from this branch:** older dual-shell mock assets (`mock-orb` / `mock-input-bar` HTML+JS) are **not** in the tree; the cat companion UI is the only renderer surface.
 
 ---
 
@@ -35,14 +35,14 @@ npm start
 
 | Accelerator | Behavior |
 |-------------|-----------|
-| **Ctrl+R** (`CommandOrControl+R`) | Primary shrink trigger — run capture + score → show hover widget (see **focus order** below). |
+| **Ctrl+R** (`CommandOrControl+R`) | Primary shrink trigger — show cat companion, then capture + score (see **focus order** below). |
 | **Ctrl+Alt+R** / **Ctrl+Shift+R** (Windows fallbacks) | Same as shrink if the first binding failed to register (another app seized **Ctrl+R**). |
 | **Ctrl+Shift+S** (+ extra fallbacks on Windows) | Forced pipeline (threshold bypass). |
 | **Ctrl+Shift+D** | Toggle demo mode (DEMO badge; threshold gating still computed for logging). |
 
 > **Historical doc drift:** Older specs say **Cmd+T**. Team aligned on **`Ctrl+R`** / **`CommandOrControl+R`** (macOS uses Cmd).
 
-**Focus / timing:** The main process runs **`runCaptureFlow` (selection + score) before the first `showWindow`** so the **foreground app keeps focus** for selection read (UI Automation or Ctrl+C). Do not reintroduce “show loading widget before capture” without revisiting this.
+**Focus / timing (hotkey path):** On **Ctrl+R**, the cat window is shown **immediately** with **`showInactive()`** so the **previous app stays foreground** while **`runCaptureSelectionPhase`** runs (UI Automation or Ctrl+C). After text is captured, the window is **focused**; **`score`** runs; **`shrink:presentation`** sends **`phase: 'selection'` → `'score'` → final score** payloads. Do not activate the BrowserWindow before capture completes without revisiting selection reliability.
 
 ---
 
@@ -64,7 +64,7 @@ Set **`DISABLE_UIA_SELECTION=1`** in `.env` to skip UIA and always use the clipb
 
 ## Protected regions (optimize)
 
-- **Frontend:** User drag-selects **verbatim keep** spans on the Original panel; offsets are sent as **`protectedRegions: [{ start, end }]`** (UTF-16 indices, half-open) with **`shrink:generate-optimized`**.
+- **Frontend:** User drag-selects **verbatim keep** spans in the panel **“Your prompt”** (`.protected-span`); offsets are sent as **`protectedRegions: [{ start, end }]`** (UTF-16 indices, half-open) with **`shrink:generate-optimized`**.
 - **Backend-2:** **`optimize(text, scoreResult, client, config, { protectedRegions })`**. Prompts use **`<<PROTECTED>>…<</PROTECTED>>`** markers; output is stripped of stray markers; **`safety < 2.0`** forces **safety override** (ignore protections) in code. See **`temp/PROTECTED_REGIONS_SPEC.md`** for narrative detail.
 
 ---
@@ -75,8 +75,8 @@ Set **`DISABLE_UIA_SELECTION=1`** in `.env` to skip UIA and always use the clipb
 main.js                     # Electron entry; require('dotenv').config({ path: join(__dirname, '.env') })
 preload.js                  # contextBridge → window.shrink
 backend1/
-  index.js                  # init; hotkeys — runCaptureFlow BEFORE first show (focus-safe)
-  window.js / hotkey.js     # Hover BrowserWindow + globalShortcut (+ Windows shrink fallbacks)
+  index.js                  # init; hotkeys — inactive window → capture → focus → score → IPC
+  window.js / hotkey.js     # Cat BrowserWindow + globalShortcut (+ Windows shrink fallbacks)
   selection.js              # Win: UIA selection → else clipboard ^c snapshot
   ipc.js                    # ipcMain handlers
   brain.js                  # Dynamic import Backend-2; optimize options passthrough
@@ -86,6 +86,7 @@ backend1/
   forward-prompt.js         # Clipboard + optional Windows foreground + paste bridge
 renderer/
   index.html app.js styles.css
+  cats/                     # Cat PNG assets (mood / loading)
 scripts/
   win-selection-uia.ps1     # UI Automation TextPattern selection (no clipboard)
   win-paste-foreground.ps1  # Activate HWND + ^v (Replace)
@@ -108,15 +109,15 @@ Preload exposes **`window.shrink`** (see **`preload.js`** / **`backend1/ipc.js`*
 | `shrink:capture-selection` | `{ forced? }` — selection + Backend-2 **`score`** |
 | `shrink:generate-optimized` | **`{ protectedRegions?: { start, end }[] }`** — **`optimize`** with optional regions |
 | `shrink:copy-to-clipboard` | `{ text? }` |
-| `shrink:replace-with-optimized` | Clipboard + optional Windows paste + hide widget |
-| `shrink:close-widget` | Hide hover |
+| `shrink:replace-with-optimized` | Clipboard + optional Windows paste + hide window |
+| `shrink:close-widget` | Hide cat window (✕ / quit) |
 | `shrink:get-state` / `get-config` | Session / config |
 | `shrink:open-log` | Open log file |
 | `shrink:score-live` | `{ text }` — ad hoc **`score`** |
 | `shrink:chat-send` | `{ text }` — **`chat`** turn |
 | `shrink:forward-prompt` / forward prefs | External paste bridge |
 
-`shrink:presentation` (main → renderer) carries **`loading`**, **`capture`**, **`config`** payloads.
+`shrink:presentation` (main → renderer) carries **`loading`**, **`capture`** (with optional **`phase`**: `'selection'` \| `'score'`), **`config`** payloads. The cat UI listens via **`shrink.onPresentation`**.
 
 ---
 

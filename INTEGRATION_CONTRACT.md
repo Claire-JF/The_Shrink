@@ -2,6 +2,8 @@
 
 Backend-2 is a pure JS library (ESM under `src/`). Backend-1 imports and calls it from the Electron main process via **`backend1/brain.js`** dynamic `import()`.
 
+The **Zoe** branch ships the **cat companion** renderer; UI talks to Backend-1 only through **`preload.js`** (`window.shrink`). See **[AGENT_CONTEXT.md](AGENT_CONTEXT.md)** for IPC and **[README.md](README.md)** for run/setup.
+
 ## Import
 
 ```javascript

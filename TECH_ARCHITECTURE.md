@@ -107,7 +107,7 @@ When code and this document disagree, prefer **`AGENT_CONTEXT.md` + `INTEGRATION
 | Component | Choice | Why |
 |-----------|--------|-----|
 | Desktop shell | Electron | Cross-team known, alwaysOnTop / globalShortcut built in |
-| Hotkey | `globalShortcut` — **primary** `CommandOrControl+R`; **`Ctrl+Shift+W`** dual mock shell; `+S` forced; `+D` demo | Electron built-in |
+| Hotkey | `globalShortcut` — **primary** `CommandOrControl+R`; `+S` forced; `+D` demo | Electron built-in |
 | Selection capture | Win: PowerShell `[SendKeys]::SendWait('^c')`; mac path TBD | Repo currently **Windows-validated** (`backend1/selection.js`) |
 | LLM API | CLōD (OpenAI-compatible) | Sponsor track + free credits |
 | Fast model | TBD from clod.io/models — confirm by 11:30 | Used for scoring when the capture hotkey fires (+ live mock strip debounced) |
@@ -116,7 +116,7 @@ When code and this document disagree, prefer **`AGENT_CONTEXT.md` + `INTEGRATION
 | IPC | `ipcMain.handle` / `ipcRenderer.invoke` | Standard Electron pattern |
 | (P1) Context layer | Nia REST API | Sponsor track + grounding story |
 
-**Window styling:** hover widget uses opaque rounded styling. The **mock orb** experiment uses `transparent: true` (Windows) — keep isolation from the main judging flow if focus issues appear.
+**Window styling:** cat companion window uses the Zoe renderer (`renderer/`). See **`design.md`** and **`AGENT_CONTEXT.md`** for the shipped shell.
 
 ---
 
@@ -168,8 +168,7 @@ When code and this document disagree, prefer **`AGENT_CONTEXT.md` + `INTEGRATION
 | `shrink:chat-send` | mock strip → main | `{ text }` multi-turn assistant |
 | `shrink:forward-prompt` | mock strip → main | Clipboard + Windows foreground paste bridge |
 | `shrink:forward-prefs-get` / `…-set` | mock UI | persisted forward target dropdown |
-| `mock-ui:resize-bar`, `mock-ui:dismiss-shell` | mock shell | layout helpers |
-| Telemetry `mock-ui:telemetry` (send) / `mock-ui:orbit` (recv) | orb sync | **not** invoke API — event channel |
+| *(historical)* mock-ui channels | removed from main branch | — |
 
 ---
 
@@ -192,7 +191,7 @@ Roles are owners of code areas, not silos. Anyone can ask anyone for help.
 
 ### Person A — Electron shell + selection capture
 
-**Owner of:** `main.js`, `preload.js`, `backend1/window.js`, `backend1/selection.js`, `backend1/config.js`, mock shell, forward bridge
+**Owner of:** `main.js`, `preload.js`, `backend1/window.js`, `backend1/selection.js`, `backend1/config.js`, forward bridge
 
 **Tasks (priority order):**
 
