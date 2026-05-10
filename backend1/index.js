@@ -35,9 +35,10 @@ async function onShrinkHotkey(forced) {
   }
   if (!win || win.isDestroyed()) return;
 
-  // Open immediately — most perceived delay is networking to score(); don't block UI until then.
-  presentWhenReady(win, { type: 'loading', payload: {} });
-
+  /**
+   * Run capture + score BEFORE showing the hover window so the foreground app
+   * keeps focus for UI Automation / Ctrl+C selection (Electron must not activate first).
+   */
   let result;
   try {
     result = await runCaptureFlow({ forced });
