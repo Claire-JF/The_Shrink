@@ -7,11 +7,12 @@ const MOCK_SCORE = JSON.stringify({
 });
 
 const MOCK_OPTIMIZED = JSON.stringify({
-  optimizedText: 'Could you please review the Q3 marketing budget spreadsheet we discussed on Monday? I need your feedback on the projected costs by end of day Friday so we can finalize the plan before the team meeting next Tuesday.',
+  optimizedText: '**Role:** You are a project coordinator reviewing a shared document.\n\n**Task:** Review the Q3 marketing budget spreadsheet we discussed on Monday.\n\n**Constraints:**\n- Focus on projected costs\n- Provide feedback by end of day Friday\n- Flag any items over budget\n\n**Output Format:** Bullet-point list of concerns and suggestions.',
   changes: [
+    'Restructured into AI-Intent format (Role / Task / Constraints / Output Format)',
     'Replaced vague reference "the thing" with specific subject',
     'Added concrete deadline instead of "soon"',
-    'Specified what "good" means in context',
+    'Specified expected output format',
   ],
 });
 

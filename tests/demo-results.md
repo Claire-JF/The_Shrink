@@ -88,3 +88,53 @@ scan effect、outline、角色受击闪白这几个东西互相打架。
 2. 明确请求分析功能、潜在问题和优化建议
 3. 要求简要说明代码各部分作用
 4. 结构化了请求，使其更具体和易于理解
+
+---
+
+## Prompt 3: Protected Regions 测试（Toon Shading + 保留情绪表达）
+
+### 原始 Prompt
+
+同 Prompt 1，但用户划选保护了 `我现在脑子已经有点炸了。` 这句话。
+
+Protected regions: `[{ start: 223, end: 235 }]`
+
+### 评分结果（Qwen2.5 7B, 6.0s）
+
+| 维度 | 分数 |
+|---|---|
+| Clarity | 5.0 |
+| Safety | 5.0 |
+| Emotional Balance | 3.8 |
+| **Total** | **4.6** |
+
+> Summary: "Slight emotional overload expressed, but request remains objective and actionable."
+
+### 优化结果（Qwen2.5 72B, 9.4s, with protected region）
+
+**优化后文本（AI-Intent 结构化）：**
+
+```
+1. Role & Context — Act as an experienced technical artist or shader programmer familiar with toon shading and real-time demo preparation.
+2. Task — Help prioritize and break down the current technical challenges for an upcoming team demo involving toon shading.
+3. Constraints —
+- Consider scan effect, outline, and character hit-flash (white flash on hit) features, which are currently conflicting.
+- Advise on whether to continue fixing technical issues or to fake a presentable version for the demo.
+- Categorize features into: must-have for the demo, can be cheated/faked, and likely time sinks.
+4. Output Format — Use a clear, bullet-pointed list for each category, with brief reasoning for each item.
+
+我现在脑子已经有点炸了。
+```
+
+**改动：**
+
+1. Specified the AI role as a technical artist/shader programmer
+2. Clarified the task as prioritizing and breaking down demo features
+3. Structured the request into clear categories (must-have, can cheat, time sinks)
+4. Specified bullet-pointed output format with reasoning
+5. Retained the protected emotional statement verbatim
+
+**验证：**
+- Protected text preserved: YES
+- Safety override: false
+- Protected regions in output: 1 (位置: start=709, end=721)

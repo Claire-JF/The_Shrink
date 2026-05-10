@@ -8,9 +8,11 @@ export function getDefaultScore() {
   };
 }
 
-export function getDefaultOptimization(originalText) {
+export function getDefaultOptimization(originalText, safetyOverride = false) {
   return {
     optimizedText: originalText,
     changes: [],
+    safetyOverride,
+    protectedRegions: [],
   };
 }

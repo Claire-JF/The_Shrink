@@ -40,7 +40,7 @@ export function validateScore(obj) {
   };
 }
 
-export function validateOptimized(obj) {
+export function validateOptimized(obj, protectedTexts = []) {
   const errors = [];
 
   if (!obj || typeof obj !== 'object') {
@@ -53,6 +53,16 @@ export function validateOptimized(obj) {
 
   if (!Array.isArray(obj.changes) || !obj.changes.every(c => typeof c === 'string')) {
     errors.push('changes must be an array of strings');
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, data: null, errors };
+  }
+
+  for (const snippet of protectedTexts) {
+    if (!obj.optimizedText.includes(snippet)) {
+      errors.push(`Protected region missing from output: "${snippet.slice(0, 40)}..."`);
+    }
   }
 
   if (errors.length > 0) {
