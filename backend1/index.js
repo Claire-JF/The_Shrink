@@ -7,6 +7,7 @@ const config = require('./config');
 const brain = require('./brain');
 const windowMod = require('./window');
 const hotkey = require('./hotkey');
+const tray = require('./tray');
 const {
   registerIpc,
   runCaptureSelectionPhase,
@@ -118,30 +119,51 @@ async function initBackend1() {
   await brain.initBrain().catch((e) => logger.warn('Backend-2 init failed', { message: e.message }));
 
   registerIpc();
+  const demoToggle = () => {
+    const on = config.toggleDemoMode();
+    logger.info('demo mode toggled', { demoMode: on });
+    const win = windowMod.getWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('shrink:presentation', {
+        type: 'config',
+        payload: { demoMode: on },
+      });
+    }
+  };
+
   hotkey.register({
     onShrinkTrigger: () => onShrinkHotkey(false),
     onForcedTrigger: () => onShrinkHotkey(true),
-    onDemoToggle: () => {
-      const on = config.toggleDemoMode();
-      logger.info('demo mode toggled', { demoMode: on });
-      const win = windowMod.getWindow();
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('shrink:presentation', {
-          type: 'config',
-          payload: { demoMode: on },
-        });
-      }
-    },
+    onDemoToggle: demoToggle,
   });
+
+  tray.initTray({
+    onShrinkTrigger: () => onShrinkHotkey(false),
+    onForcedTrigger: () => onShrinkHotkey(true),
+    onDemoToggle: demoToggle,
+  });
+
+  const reg = hotkey.getRegisteredAccelerators();
+  if (!reg.shrink) {
+    logger.error(
+      'No global shrink shortcut registered — app still works via tray icon / menu (Wayland often blocks globalShortcut).',
+      { sessionType: process.env.XDG_SESSION_TYPE, waylandDisplay: !!process.env.WAYLAND_DISPLAY },
+    );
+    console.error(
+      '[The Shrink] Keyboard shortcuts failed to register. Click the tray cat icon → "Shrink selection", or use an X11 session / XWayland.',
+    );
+  }
 
   logger.info('Backend-1 initialized', {
     demoMode: config.get('demoMode'),
     mockSelection: config.get('mockSelection'),
+    accelerators: reg,
   });
 }
 
 function disposeBackend1() {
   hotkey.unregister();
+  tray.destroyTray();
   windowMod.destroyWindow();
 }
 

@@ -6,6 +6,13 @@ const logger = require('./logger');
 
 let registered = false;
 
+/** Last successfully registered accelerator per role (null = none worked). */
+const lastRegistered = {
+  shrink: null,
+  forced: null,
+  demoToggle: null,
+};
+
 function wrapHandler(acc, fn) {
   return () => {
     try {
@@ -21,10 +28,16 @@ function wrapHandler(acc, fn) {
 
 function registerFirstWorking(label, accelerators, fn) {
   for (const acc of accelerators) {
-    if (globalShortcut.register(acc, wrapHandler(acc, fn))) {
+    const ok = globalShortcut.register(acc, wrapHandler(acc, fn));
+    if (ok) {
       logger.info('registered shortcut', { acc, role: label });
       return acc;
     }
+    logger.warn('shortcut registration failed — accelerator busy or unsupported', {
+      acc,
+      role: label,
+      platform: process.platform,
+    });
   }
   logger.error('failed to register shortcut (exhausted fallbacks)', { role: label, accelerators });
   return null;
@@ -45,7 +58,7 @@ function register(handlers) {
     'Control+Alt+R',
     'CommandOrControl+Shift+R',
   ];
-  registerFirstWorking('shrink', shrinkChain, handlers.onShrinkTrigger);
+  lastRegistered.shrink = registerFirstWorking('shrink', shrinkChain, handlers.onShrinkTrigger);
 
   const forcedChain =
     process.platform === 'win32'
@@ -55,21 +68,33 @@ function register(handlers) {
           'CommandOrControl+Alt+Shift+S',
         ]
       : ['CommandOrControl+Shift+S', 'CommandOrControl+Alt+S'];
-  registerFirstWorking('forced', forcedChain, handlers.onForcedTrigger);
+  lastRegistered.forced = registerFirstWorking('forced', forcedChain, handlers.onForcedTrigger);
 
-  registerFirstWorking('demo-toggle', ['CommandOrControl+Shift+D'], handlers.onDemoToggle);
+  lastRegistered.demoToggle = registerFirstWorking(
+    'demo-toggle',
+    ['CommandOrControl+Shift+D'],
+    handlers.onDemoToggle,
+  );
 
   registered = true;
+}
+
+function getRegisteredAccelerators() {
+  return { ...lastRegistered };
 }
 
 function unregister() {
   if (!registered) return;
   globalShortcut.unregisterAll();
   registered = false;
+  lastRegistered.shrink = null;
+  lastRegistered.forced = null;
+  lastRegistered.demoToggle = null;
   logger.info('unregistered all shortcuts');
 }
 
 module.exports = {
   register,
   unregister,
+  getRegisteredAccelerators,
 };
