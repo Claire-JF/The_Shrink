@@ -9,15 +9,15 @@ const windowMod = require('./window');
 const hotkey = require('./hotkey');
 const { registerIpc, runCaptureFlow } = require('./ipc');
 
-function sendCaptureWhenReady(win, result) {
+/**
+ * Deliver renderer payload once webContents can receive IPC, then reveal the hover window.
+ */
+function presentWhenReady(win, envelope) {
   const send = () => {
     if (!win.isDestroyed()) {
-      win.webContents.send('shrink:presentation', {
-        type: 'capture',
-        payload: result,
-      });
+      win.webContents.send('shrink:presentation', envelope);
+      windowMod.showWindow();
     }
-    windowMod.showWindow();
   };
 
   if (win.webContents.isLoading()) {
@@ -34,6 +34,9 @@ async function onShrinkHotkey(forced) {
     win = windowMod.getWindow();
   }
   if (!win || win.isDestroyed()) return;
+
+  // Open immediately — most perceived delay is networking to score(); don't block UI until then.
+  presentWhenReady(win, { type: 'loading', payload: {} });
 
   let result;
   try {
@@ -54,7 +57,7 @@ async function onShrinkHotkey(forced) {
     return;
   }
 
-  sendCaptureWhenReady(win, result);
+  presentWhenReady(win, { type: 'capture', payload: result });
 }
 
 async function initBackend1() {

@@ -67,6 +67,23 @@ function pickOptimizedText(opt) {
   return '';
 }
 
+function showLoadingState() {
+  $('rightTitle').textContent = 'Working';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('changes').classList.add('hidden');
+  $('original').textContent = 'Reading selection…';
+  setScore(null);
+  const ul = $('flags');
+  ul.classList.remove('hidden');
+  ul.innerHTML = '';
+  const li = document.createElement('li');
+  li.textContent = 'Scoring with cloud model — usually a few hundred ms to a couple seconds';
+  ul.appendChild(li);
+  $('btnGenerate').disabled = true;
+}
+
 function showState1(payload) {
   $('rightTitle').textContent = 'Score';
   $('optimized').classList.add('hidden');
@@ -75,7 +92,10 @@ function showState1(payload) {
   $('flags').classList.remove('hidden');
   $('changes').classList.add('hidden');
 
-  const text = payload.capturedText || '';
+  let text = payload.capturedText || '';
+  if (payload.error) {
+    text = `(Error) ${payload.error}${text ? `\n${text}` : ''}`.trim();
+  }
   $('original').textContent = text || '(empty capture)';
   setScore(payload.score);
   renderScoreDetails(payload.score);
@@ -109,6 +129,9 @@ async function bootstrap() {
 
   shrink.onPresentation((msg) => {
     if (!msg) return;
+    if (msg.type === 'loading') {
+      showLoadingState();
+    }
     if (msg.type === 'capture' && msg.payload) {
       showState1(msg.payload);
     }
