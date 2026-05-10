@@ -16,22 +16,28 @@
       <button type="button" id="btnClose" class="icon-btn" aria-label="Close">✕</button>
     </header>
 
-    <main class="grid">
-      <section class="col">
-        <h2>Original</h2>
-        <pre id="original" class="box">—</pre>
-      </section>
-      <section class="col">
-        <h2 id="rightTitle">Issues</h2>
-        <ul id="flags" class="flags"></ul>
-        <ul id="changes" class="changes hidden"></ul>
-        <pre id="optimized" class="box hidden">—</pre>
-        <div class="actions">
-          <button type="button" id="btnGenerate" class="pill">Generate</button>
-          <button type="button" id="btnReplace" class="pill secondary hidden">Replace selection</button>
-          <button type="button" id="btnCopy" class="pill secondary hidden">Copy</button>
-        </div>
-      </section>
+    <main class="stage">
+      <div id="loadingOverlay" class="loading-overlay hidden" aria-hidden="true">
+        <div class="loading-spinner" role="presentation"></div>
+        <p id="loadingMessage" class="loading-msg">Working…</p>
+      </div>
+      <div class="grid">
+        <section class="col">
+          <h2>Original</h2>
+          <pre id="original" class="box">—</pre>
+        </section>
+        <section class="col">
+          <h2 id="rightTitle">Issues</h2>
+          <ul id="flags" class="flags"></ul>
+          <ul id="changes" class="changes hidden"></ul>
+          <pre id="optimized" class="box hidden">—</pre>
+          <div class="actions">
+            <button type="button" id="btnGenerate" class="pill">Generate</button>
+            <button type="button" id="btnReplace" class="pill secondary hidden">Replace selection</button>
+            <button type="button" id="btnCopy" class="pill secondary hidden">Copy</button>
+          </div>
+        </section>
+      </div>
     </main>
 
     <footer class="ft">

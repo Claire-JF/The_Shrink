@@ -9,6 +9,15 @@ function setScore(score) {
   $('scoreLabel').textContent = `Score ${t} / 5.0`;
 }
 
+function setBusyOverlay(visible, message) {
+  const overlay = $('loadingOverlay');
+  const msgEl = $('loadingMessage');
+  if (!overlay || !msgEl) return;
+  overlay.classList.toggle('hidden', !visible);
+  overlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  msgEl.textContent = message || 'Please wait…';
+}
+
 const DIM_KEYS = ['clarity', 'specificity', 'safety', 'tone', 'actionability'];
 const DIM_LABEL = {
   clarity: 'Clarity',
@@ -68,23 +77,20 @@ function pickOptimizedText(opt) {
 }
 
 function showLoadingState() {
-  $('rightTitle').textContent = 'Working';
+  $('rightTitle').textContent = '';
   $('optimized').classList.add('hidden');
   $('btnCopy').classList.add('hidden');
   $('btnReplace').classList.add('hidden');
   $('changes').classList.add('hidden');
-  $('original').textContent = 'Reading selection…';
+  $('flags').classList.add('hidden');
+  $('original').textContent = '…';
   setScore(null);
-  const ul = $('flags');
-  ul.classList.remove('hidden');
-  ul.innerHTML = '';
-  const li = document.createElement('li');
-  li.textContent = 'Scoring with cloud model — usually a few hundred ms to a couple seconds';
-  ul.appendChild(li);
   $('btnGenerate').disabled = true;
+  setBusyOverlay(true, 'Reading selection & scoring…');
 }
 
 function showState1(payload) {
+  setBusyOverlay(false);
   $('rightTitle').textContent = 'Score';
   $('optimized').classList.add('hidden');
   $('btnCopy').classList.add('hidden');
@@ -103,6 +109,7 @@ function showState1(payload) {
 }
 
 function showState2(opt) {
+  setBusyOverlay(false);
   $('rightTitle').textContent = 'Optimized';
   $('flags').classList.add('hidden');
   $('optimized').classList.remove('hidden');
@@ -144,7 +151,13 @@ async function bootstrap() {
 
   $('btnGenerate').addEventListener('click', async () => {
     $('btnGenerate').disabled = true;
-    const result = await shrink.generateOptimized();
+    setBusyOverlay(true, 'Optimizing prompt…');
+    let result;
+    try {
+      result = await shrink.generateOptimized();
+    } finally {
+      setBusyOverlay(false);
+    }
     const body = pickOptimizedText(result);
     if (body) {
       showState2(result);
