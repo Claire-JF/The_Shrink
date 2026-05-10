@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Shrink Renderer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="mode-cat phase-issues">
+    <div class="shell" id="shell">
+      <div class="pet-shell" id="petShell">
+        <div class="pet" id="pet">
+          <button class="pet__bubble" id="petBubble" type="button" aria-label="Open prompt review panel">
+            Waiting for score…
+          </button>
+
+          <div class="pet__cat-wrap">
+            <button class="pet__quit" id="quitButton" type="button" aria-label="Quit app">✕</button>
+            <img class="pet__cat" id="catFace" src="./cats/cat_happy.png" alt="cat" />
+            <div class="score-hover" id="scoreHover" aria-hidden="true" role="tooltip"></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="panel" id="panel" aria-hidden="true">
+        <button class="panel__close" id="collapseButton" type="button" aria-label="Collapse panel">✕</button>
+        <div class="panel__content">
+          <div class="panel__topline">
+            <label class="model-switch" for="scorerSelect">
+              <select class="model-switch__input" id="scorerSelect" aria-label="Scoring model">
+                <option value="Qwen2.5-7B">Qwen2.5-7B</option>
+                <option value="Qwen2.5-72B">Qwen2.5-72B</option>
+              </select>
+            </label>
+            <div class="panel__controls">
+              <div class="panel__scoreline" id="panelScoreline">– / 5.0</div>
+            </div>
+          </div>
+
+          <div class="panel__hero">
+            <div class="panel__title" id="panelTitle">Prompt feels unsettled</div>
+            <div class="panel__subtitle" id="panelSubtitle">Waiting for clipboard score…</div>
+          </div>
+
+          <div class="editor-section is-hidden" id="editorSection">
+            <div class="editor-section__header">
+              <div class="panel__eyebrow">Optimized prompt</div>
+              <div class="editor-section__tools" aria-label="Optimized prompt actions">
+                <button
+                  class="icon-button icon-button--copy is-hidden"
+                  id="copyButton"
+                  type="button"
+                  aria-label="Copy optimized prompt"
+                  title="Copy"
+                >⧉</button>
+                <button
+                  class="icon-button icon-button--ghost is-hidden"
+                  id="regenerateButton"
+                  type="button"
+                  aria-label="Regenerate optimized prompt"
+                  title="Regenerate"
+                >↻</button>
+              </div>
+            </div>
+            <textarea
+              class="editor-section__textarea"
+              id="optimizedEditor"
+              spellcheck="false"
+              aria-label="Optimized prompt"
+            ></textarea>
+            <div class="metric-strip" id="metricStrip"></div>
+          </div>
+
+          <div class="summary-block is-hidden" id="summaryBlock"></div>
+          <div class="issues-groups" id="issuesGroups"></div>
+          <div class="metric-detail is-hidden" id="metricDetail"></div>
+
+          <div class="original-section is-hidden" id="originalSection">
+            <div class="original-section__label">
+              <span class="panel__eyebrow">Your prompt</span>
+              <span class="original-section__hint">Drag to protect · click to remove</span>
+            </div>
+            <div
+              class="original-field"
+              id="originalField"
+              aria-label="Original prompt — drag to protect text"
+            ></div>
+          </div>
+        </div>
+
+        <footer class="panel__footer">
+          <button class="action-button action-button--primary" id="actionButton" type="button">
+            Optimize my input
+          </button>
+        </footer>
+      </section>
+    </div>
+
+    <div class="petal-tip" id="petalTip" aria-hidden="true" role="tooltip"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
