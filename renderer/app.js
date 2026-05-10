@@ -101,10 +101,9 @@ const state = {
   drag: {
     active: false,
     pointerId: null,
-    offsetX: 0,
-    offsetY: 0,
-    startX: 0,
-    startY: 0,
+    /** @type {{ x: number, y: number, width: number, height: number } | null} */
+    winStart: null,
+    ptrStart: null,
     moved: false,
     suppressClick: false,
   },
@@ -200,6 +199,7 @@ function setMode(mode) {
     setBubbleVisible(false);
     resetBubbleTimer();
   }
+  scheduleSyncOrbWindow();
 }
 
 function setPhase(phase) {
@@ -307,18 +307,22 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function setShellPosition(left, top) {
-  const margin = 8;
-  const shellRect = elements.shell.getBoundingClientRect();
-  const catSize = elements.catWrap.getBoundingClientRect().width || CAT_SIZE;
-  const shellWidth = shellRect.width || 360;
-  const minLeft = margin;
-  const maxLeft = Math.max(minLeft, window.innerWidth - shellWidth - margin);
-  const maxTop = window.innerHeight - catSize - margin;
+let syncOrbTimer = null;
 
-  elements.shell.style.left = `${clamp(left, minLeft, maxLeft)}px`;
-  elements.shell.style.top = `${clamp(top, margin, maxTop)}px`;
-  elements.shell.style.right = "auto";
+function scheduleSyncOrbWindow() {
+  if (typeof shrink === "undefined" || typeof shrink.syncOrbContentSize !== "function") {
+    return;
+  }
+  if (syncOrbTimer) window.clearTimeout(syncOrbTimer);
+  syncOrbTimer = window.setTimeout(() => {
+    syncOrbTimer = null;
+    const el = elements.shell;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    if (w > 0 && h > 0) {
+      shrink.syncOrbContentSize({ width: w, height: h, keepTopRight: true });
+    }
+  }, 48);
 }
 
 function buildIssueSections(scoreData) {
@@ -967,17 +971,18 @@ function handleKeydown(event) {
   }
 }
 
-function handleCatPointerDown(event) {
+async function handleCatPointerDown(event) {
   if (event.button !== 0) return;
   if (event.target.closest(".pet__quit")) return;
+  if (typeof shrink.getWindowBounds !== "function") return;
 
-  const shellRect = elements.shell.getBoundingClientRect();
+  const bounds = await shrink.getWindowBounds();
+  if (!bounds || typeof bounds.x !== "number") return;
+
   state.drag.active = true;
   state.drag.pointerId = event.pointerId;
-  state.drag.offsetX = event.clientX - shellRect.left;
-  state.drag.offsetY = event.clientY - shellRect.top;
-  state.drag.startX = event.clientX;
-  state.drag.startY = event.clientY;
+  state.drag.winStart = bounds;
+  state.drag.ptrStart = { x: event.screenX, y: event.screenY };
   state.drag.moved = false;
   elements.shell.classList.add("is-dragging");
   elements.catWrap.setPointerCapture(event.pointerId);
@@ -985,9 +990,10 @@ function handleCatPointerDown(event) {
 
 function handleCatPointerMove(event) {
   if (!state.drag.active || event.pointerId !== state.drag.pointerId) return;
+  if (!state.drag.winStart || !state.drag.ptrStart) return;
 
-  const deltaX = event.clientX - state.drag.startX;
-  const deltaY = event.clientY - state.drag.startY;
+  const deltaX = event.screenX - state.drag.ptrStart.x;
+  const deltaY = event.screenY - state.drag.ptrStart.y;
 
   if (!state.drag.moved && Math.hypot(deltaX, deltaY) > 4) {
     state.drag.moved = true;
@@ -995,7 +1001,11 @@ function handleCatPointerMove(event) {
 
   if (state.drag.moved) {
     event.preventDefault();
-    setShellPosition(event.clientX - state.drag.offsetX, event.clientY - state.drag.offsetY);
+    const nx = state.drag.winStart.x + deltaX;
+    const ny = state.drag.winStart.y + deltaY;
+    if (typeof shrink.setWindowPosition === "function") {
+      shrink.setWindowPosition({ x: nx, y: ny });
+    }
   }
 }
 
@@ -1034,8 +1044,7 @@ function handleCatClick(event) {
 }
 
 function handleViewportResize() {
-  const rect = elements.shell.getBoundingClientRect();
-  setShellPosition(rect.left, rect.top);
+  scheduleSyncOrbWindow();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -1072,10 +1081,15 @@ function init() {
     return;
   }
 
+  const shellResizeObserver = new ResizeObserver(() => scheduleSyncOrbWindow());
+  shellResizeObserver.observe(elements.shell);
+
   shrink.onPresentation(handlePresentation);
   if (elements.replaceButton) {
     elements.replaceButton.addEventListener("click", handleReplace);
   }
+
+  requestAnimationFrame(() => scheduleSyncOrbWindow());
 }
 
 init();

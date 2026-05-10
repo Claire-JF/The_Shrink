@@ -25,25 +25,19 @@
 html,
 body {
   margin: 0;
-  min-height: 100%;
+  min-height: 0;
   font-family: var(--font);
   color: var(--ink);
+  /* Electron transparent BrowserWindow — window shrinks to orb/panel chrome only */
+  background: transparent;
+}
+
+html {
+  overflow: hidden;
 }
 
 body {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at 16% 18%, rgba(145, 196, 255, 0.4), transparent 24%),
-    radial-gradient(circle at 82% 68%, rgba(70, 133, 255, 0.24), transparent 28%),
-    linear-gradient(180deg, #4f96de 0%, #2d79cf 42%, #2768ba 100%);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  backdrop-filter: blur(2px);
+  min-height: 0;
 }
 
 button,
@@ -60,19 +54,27 @@ button {
 }
 
 .shell {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  width: min(360px, calc(100vw - 36px));
+  position: relative;
+  margin: 8px;
+  box-sizing: border-box;
+}
+
+/* Cat-only: tight width like a desktop float orb; panel hidden from layout */
+body.mode-cat .shell {
+  width: max-content;
+  max-width: min(360px, calc(100vw - 16px));
+}
+
+body.mode-panel .shell {
+  width: min(360px, calc(100vw - 16px));
 }
 
 body.mode-cat .panel {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(8px) scale(0.98);
+  display: none !important;
 }
 
 body.mode-panel .panel {
+  display: flex;
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0) scale(1);
