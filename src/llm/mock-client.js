@@ -1,17 +1,7 @@
 /**
- * In-process mock (no HTTP mock server). Same return shapes as real LLM.
- * Heuristics from Backend-2 TESTING_GUIDE / mock handoff.
+ * In-process mock (no HTTP). Same return shapes as real LLM (INTEGRATION_CONTRACT).
+ * Score responses use simple keyword tiers so CLI tests pass without live API keys.
  */
-
-const MOCK_SCORE = JSON.stringify({
-  clarity: 2.5,
-  specificity: 1.7,
-  safety: 4.8,
-  tone: 3.3,
-  actionability: 2.0,
-  total: 2.86,
-  summary: 'Text is vague and lacks actionable specifics',
-});
 
 const MOCK_OPTIMIZED = JSON.stringify({
   optimizedText:
@@ -25,24 +15,63 @@ const MOCK_OPTIMIZED = JSON.stringify({
 
 const MOCK_WARMUP = 'OK';
 
+/** @typedef {'neutral' | 'vague' | 'danger' | 'pressure'} ScoreTier */
+
+/** @param {ScoreTier} tier */
+function scorePayloadForTier(tier) {
+  const base = {
+    clarity: 2.5,
+    specificity: 1.8,
+    safety: 4.6,
+    tone: 3.2,
+    actionability: 2.4,
+    summary:
+      tier === 'danger'
+        ? 'Unsafe or harmful-request content'
+        : tier === 'pressure'
+          ? 'Manipulative pressure on the assistant'
+          : tier === 'vague'
+            ? 'Prompt is vague and underspecified'
+            : 'Representative sandbox score',
+  };
+  if (tier === 'vague') Object.assign(base, { clarity: 1.9, specificity: 1.3 });
+  if (tier === 'danger') Object.assign(base, { safety: 1.1 });
+  if (tier === 'pressure') Object.assign(base, { tone: 1.3 });
+  const dims = [base.clarity, base.specificity, base.safety, base.tone, base.actionability];
+  base.total = Math.round((dims.reduce((a, b) => a + b, 0) / 5) * 100) / 100;
+  return base;
+}
+
+function detectScoreTier(fullText) {
+  const t = fullText.toLowerCase();
+  if (t.includes('tension wrench') || t.includes('pick a lock')) return 'danger';
+  if (t.includes('cancel my subscription')) return 'pressure';
+  if (t.includes('the thing we talked about')) return 'vague';
+  return 'neutral';
+}
+
 export function createMockClient() {
   return {
     async call(model, messages, opts = {}) {
       await delay(opts.conversationTurn ? 380 : 200);
 
-      const content = messages.map((m) => m.content).join(' ').toLowerCase();
+      const content = messages.map((m) => m.content).join('\n');
 
-      if (content.includes('say ok') || content.includes('warmup')) {
+      const flat = content.toLowerCase();
+      if (flat.includes('say ok') || flat.includes('warmup')) {
         return MOCK_WARMUP;
       }
       if (opts.conversationTurn) {
         const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
         return `Mock助手：我听到的是「${String(lastUser).slice(0, 120)}…」。这是占位回复；配置真实 API Key 后会走真模型连贯对话。`;
       }
-      if (content.includes('rewrite') || content.includes('improve') || content.includes('optimize')) {
+      // optimize() uses jsonMode + temperature 0.2; scorer uses 0 — avoid matching "rewrite" in system prompt.
+      if (opts.jsonMode && Number(opts.temperature) > 0.1) {
         return MOCK_OPTIMIZED;
       }
-      return MOCK_SCORE;
+
+      const tier = detectScoreTier(content);
+      return JSON.stringify(scorePayloadForTier(tier));
     },
   };
 }
