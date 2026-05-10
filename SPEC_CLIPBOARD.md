@@ -1,6 +1,6 @@
 # The Shrink — Spec (Hotkey Edition, Final)
 
-> **Maintainers:** Product narrative lives here; **implementable truth** lives in **[AGENT_CONTEXT.md](AGENT_CONTEXT.md)**. Hotkey for the shrink widget on current builds is **Ctrl+R** (`CommandOrControl+R`), not Cmd+T. Implemented scoring fields follow **[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md)** (five 0–5 dimensions + `summary`), which **differs** from the dimension table (`Task Verb`, `Scope`, …) still described below as the original UX storyboard.
+> **Maintainers:** Product narrative lives here; **implementable truth** lives in **[AGENT_CONTEXT.md](AGENT_CONTEXT.md)**. Hotkey for the shrink widget on current builds is **Ctrl+R** (`CommandOrControl+R`), not Cmd+T. Implemented scoring fields follow **[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md)** (five 0–5 dimensions + `summary`), which **differs** from the dimension table (`Task Verb`, `Scope`, …) still described below as the original UX storyboard. **Protected spans** before Generate and **`optimize(..., { protectedRegions })`** are documented in **AGENT_CONTEXT** + **`temp/PROTECTED_REGIONS_SPEC.md`**. On Windows, selection capture prefers **UI Automation** over simulating copy; see **AGENT_CONTEXT**.
 
 ## What it is
 

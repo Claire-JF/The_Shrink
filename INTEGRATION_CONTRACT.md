@@ -1,11 +1,11 @@
 # Backend-1 ↔ Backend-2 Integration Contract
 
-Backend-2 is a pure JS library. Backend-1 imports and calls it from the Electron main process.
+Backend-2 is a pure JS library (ESM under `src/`). Backend-1 imports and calls it from the Electron main process via **`backend1/brain.js`** dynamic `import()`.
 
 ## Import
 
 ```javascript
-import { score, optimize, warmup } from './src/index.js';
+import { score, optimize, warmup, chat } from './src/index.js';
 import { createClient } from './src/llm/client.js';
 import { createMockClient } from './src/llm/mock-client.js';
 ```
@@ -14,13 +14,12 @@ import { createMockClient } from './src/llm/mock-client.js';
 
 ```javascript
 const llmConfig = {
-  baseURL: config.get('LLM_BASE_URL'),    // "https://api.clod.io/v1"
+  baseURL: config.get('LLM_BASE_URL'), // "https://api.clod.io/v1"
   apiKey: config.get('CLOD_API_KEY'),
-  fastModel: config.get('LLM_FAST_MODEL'), // "DeepSeek V3"
-  deepModel: config.get('LLM_DEEP_MODEL'), // "DeepSeek V3"
+  fastModel: config.get('LLM_FAST_MODEL'),
+  deepModel: config.get('LLM_DEEP_MODEL'),
 };
 
-// Falls back to mock automatically when no API key is set
 const client = llmConfig.apiKey ? createClient(llmConfig) : createMockClient();
 ```
 
@@ -28,17 +27,35 @@ const client = llmConfig.apiKey ? createClient(llmConfig) : createMockClient();
 
 ### `warmup(client, config) → Promise<void>`
 
-Call once on app startup. Pre-warms the HTTPS connection and validates the API key. **Never throws** — logs a warning on failure and resolves.
+Call once on app startup. **Never throws** — logs a warning on failure and resolves.
 
 ### `score(text, client, config) → Promise<ScoreJSON>`
 
-Scores input text on 5 quality dimensions. Uses `config.fastModel` at temperature 0.
+Scores input on five quality dimensions. Uses `config.fastModel` at temperature 0 (with JSON mode in implementation).
 
-### `optimize(text, scoreResult, client, config) → Promise<OptimizedJSON>`
+### `optimize(text, scoreResult, client, config, options?) → Promise<OptimizedJSON>`
 
-Rewrites text to improve the weakest scoring dimensions. Uses `config.deepModel` at temperature 0.2.
+Rewrites text. Uses `config.deepModel` at temperature ~0.2 with JSON response format.
 
-## Data Shapes
+**Fifth argument (optional):**
+
+```javascript
+await optimize(text, scoreResult, client, llmConfig, {
+  protectedRegions: [{ start: 10, end: 24 }], // UTF-16 indices into `text`, half-open [start, end)
+});
+```
+
+- **`protectedRegions`** — omit or `[]` for behavior equivalent to “rewrite everything.”
+- **Safety override:** If **`scoreResult.safety < 2.0`**, Backend-2 **clears** all protected regions in logic and performs a full rewrite; result includes **`safetyOverride: true`** and empty **`protectedRegions`**.
+- Model output may include stray **`<<PROTECTED>>`** markers — implementation strips them from **`optimizedText`** before returning.
+
+Implementation details: **`src/optimizer.js`**, **`src/prompts/optimization.js`**, **`src/protected-regions.js`**.
+
+### `chat(messages, client, config) → Promise<{ role, content }>`
+
+Multi-turn assistant (optional product feature). Uses `config.chatModel` or `config.deepModel`.
+
+## Data shapes
 
 ### ScoreJSON
 
@@ -54,7 +71,7 @@ Rewrites text to improve the weakest scoring dimensions. Uses `config.deepModel`
 }
 ```
 
-All dimension values are numbers in range **0.0–5.0**. `total` is the average of the 5 dimensions. `summary` is a one-line string explanation.
+All dimension values are **0.0–5.0**. **`total`** is the mean of the five dimensions. **`summary`** is one line.
 
 ### OptimizedJSON
 
@@ -62,53 +79,50 @@ All dimension values are numbers in range **0.0–5.0**. `total` is the average 
 {
   "optimizedText": "The improved version of the text...",
   "changes": [
-    "Added specific details to replace vague references",
-    "Clarified the timeline from 'soon' to 'by Friday'"
+    "Added specific details",
+    "Clarified constraints"
+  ],
+  "safetyOverride": false,
+  "protectedRegions": [
+    { "start": 120, "end": 145, "originalText": "verbatim slice from optimizedText" }
   ]
 }
 ```
 
-`optimizedText` is the rewritten string. `changes` is an array of strings describing what was improved.
+| Field | Type | Notes |
+|-------|------|--------|
+| `optimizedText` | string | Full rewritten prompt |
+| `changes` | string[] | 2–5 bullets describing edits |
+| `safetyOverride` | boolean | **`true`** when safety rules forced ignoring user-protected spans |
+| `protectedRegions` | array | Spans in **`optimizedText`** that were preserved verbatim; may be empty |
 
-## Error Behavior
+Legacy **`optimized_text`** / **`optimizedText`** — Backend-1 tolerates both for clipboard paths where relevant.
 
-**Backend-2 never throws.** Every function always resolves with a valid object.
+## Error behavior
 
-| Function | On failure returns |
-|---|---|
-| `score()` | All dimensions 3.0, total 3.0, summary "Unable to score" |
-| `optimize()` | Original text unchanged, empty changes array |
-| `warmup()` | Resolves silently (logs warning) |
+**Backend-2 must not throw** on `score` / `optimize` / `warmup` in normal design; failures degrade to neutral or passthrough shapes (see **`src/fallback.js`**).
 
-Backend-1 does **not** need try/catch around these calls. The UI always receives displayable data.
+| Function | Typical failure shape |
+|----------|------------------------|
+| `score()` | Neutral dimensions 3.0, summary `"Unable to score"` |
+| `optimize()` | Original text, empty `changes`, `safetyOverride` / `protectedRegions` per fallback |
+| `warmup()` | Resolves; logs warning |
 
-## Config Keys
+## Config keys (via `config` / `.env`)
 
-Backend-2 requires these 4 values (passed via the `config` object, or read from `.env`):
-
-| Key | Example | Purpose |
-|---|---|---|
-| `CLOD_API_KEY` | `clod_...` | CLōD API authentication |
-| `LLM_BASE_URL` | `https://api.clod.io/v1` | LLM endpoint |
-| `LLM_FAST_MODEL` | `DeepSeek V3` | Model for scoring (fast, temp 0) |
-| `LLM_DEEP_MODEL` | `DeepSeek V3` | Model for optimization (quality, temp 0.2) |
-| `LLM_CHAT_MODEL` | *(optional)* | Multi-turn **Send** assistant in mock input strip; defaults to `LLM_DEEP_MODEL` when unset |
+| Key | Purpose |
+|-----|---------|
+| `CLOD_API_KEY` | CLōD API key (omit → mock client) |
+| `LLM_BASE_URL` | OpenAI-compatible base URL |
+| `LLM_FAST_MODEL` | Scoring model |
+| `LLM_DEEP_MODEL` | Optimize / default chat |
+| `LLM_CHAT_MODEL` | Optional; defaults to deep model |
 
 ### Related repo docs
 
-- **`AGENT_CONTEXT.md`** — real directory layout, IPC table, hotkeys, dual mock UI & forward bridge, known gaps.
-- Runtime behavior may add channels beyond this contract; keep **INTEGRATION_CONTRACT** in sync when **public** LLM shapes change.
+- **`AGENT_CONTEXT.md`** — selection (UIA + clipboard), IPC, hotkeys, file layout.
+- **`temp/PROTECTED_REGIONS_SPEC.md`** — product copy for protected regions.
 
-## Threshold Logic
+## Backend-1 threshold note
 
-Backend-2 returns scores. Backend-1 decides whether to call `optimize()`:
-
-```javascript
-const scoreResult = await score(selectedText, client, llmConfig);
-if (scoreResult.total < SCORE_THRESHOLD) {
-  const optimized = await optimize(selectedText, scoreResult, client, llmConfig);
-  // show optimized text in UI
-}
-```
-
-The threshold value, demo mode bypass, and force-trigger logic all live in Backend-1.
+`score` / `optimize` return data only; **when** to open the widget or call **`optimize`** is decided in Backend-1/renderer. The hover UI currently presents capture results after each hotkey run per product flow.
