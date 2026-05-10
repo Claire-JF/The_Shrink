@@ -25,7 +25,7 @@ import { score, optimize, warmup, client, config } from './src/index.js';
 await warmup(client, config);
 const result = await score('任意文本', client, config);
 console.log(result);
-// → 固定返回 { clarity: 2.5, specificity: 1.7, safety: 4.8, tone: 3.3, actionability: 2.0, total: 2.86, summary: "..." }
+// → 固定返回 { clarity: 1.3, safety: 5.0, emotionalBalance: 5.0, total: 3.77, summary: "..." }
 
 const optimized = await optimize('任意文本', result, client, config);
 console.log(optimized);
@@ -53,8 +53,8 @@ cp .env.example .env
 ```env
 CLOD_API_KEY=你的真实key
 LLM_BASE_URL=https://api.clod.io/v1
-LLM_FAST_MODEL=DeepSeek V3
-LLM_DEEP_MODEL=DeepSeek V3
+LLM_FAST_MODEL=Qwen2.5 7B
+LLM_DEEP_MODEL=Qwen2.5 72B
 ```
 
 ### 第二步：验证连接
@@ -66,33 +66,34 @@ node -e "import('./src/index.js').then(m => m.warmup(m.client, m.config))"
 
 看到 `[warmup] connection ready` 就说明 CLōD 连通了。
 
-### 第三步：快速冒烟测试（6 次请求）
+### 第三步：快速冒烟测试（9 次请求）
 
 ```bash
 node tests/stability-test.js --runs=3
 ```
 
-这会用真实 LLM 对 2 个测试文本各跑 3 次评分，消耗 6 次 API 请求。
+这会用真实 LLM 对 3 个测试文本各跑 3 次评分，消耗 9 次 API 请求。
 检查输出：每次的分数应该不同（因为是真实 AI 在评分），但同一文本的分数应该比较接近。
 
-### 第四步：完整稳定性测试（40 次请求）
+### 第四步：完整稳定性测试（60 次请求）
 
 ```bash
 node tests/stability-test.js
 ```
 
-默认 20 次 × 2 个 fixture = 40 次请求。
+默认 20 次 × 3 个 fixture = 60 次请求。
 通过标准：
-- vague 文本的 total 全部 < 2.5
-- danger 文本的 total 全部 < 1.0
+- vague 文本的 clarity 全部 < 2.5
+- danger 文本的 safety 全部 < 1.5
+- emotional_manipulation 文本的 emotionalBalance 全部 < 1.5
 
 如果不通过，需要调整 `src/prompts/scoring.js` 里的 checklist 规则，然后用 `--runs=3` 快速迭代。
 
 ### 注意：CLōD 免费额度
 
 - 免费账户每天 100 次请求，午夜自动刷新
-- 完整稳定性测试消耗 40 次（每天最多跑 2 次）
-- 快速测试只消耗 6 次（适合迭代 prompt）
+- 完整稳定性测试消耗 60 次（每天最多跑 1 次）
+- 快速测试只消耗 9 次（适合迭代 prompt）
 - 正常 app 使用每次交互消耗 2 次（score + optimize）
 
 ---

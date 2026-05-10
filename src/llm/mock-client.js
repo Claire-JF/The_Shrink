@@ -1,11 +1,9 @@
 const MOCK_SCORE = JSON.stringify({
-  clarity: 2.5,
-  specificity: 1.7,
-  safety: 4.8,
-  tone: 3.3,
-  actionability: 2.0,
-  total: 2.86,
-  summary: 'Text is vague and lacks actionable specifics',
+  clarity: 1.3,
+  safety: 5.0,
+  emotionalBalance: 5.0,
+  total: 3.77,
+  summary: 'Prompt is vague and lacks specific details or context',
 });
 
 const MOCK_OPTIMIZED = JSON.stringify({

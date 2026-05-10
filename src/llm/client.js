@@ -7,13 +7,17 @@ export function createClient(config) {
   });
 
   return {
-    async call(model, messages, { temperature = 0, maxTokens = 1024 } = {}) {
-      const res = await openai.chat.completions.create({
+    async call(model, messages, { temperature = 0, maxTokens = 1024, jsonMode = false } = {}) {
+      const params = {
         model,
         messages,
         temperature,
         max_completion_tokens: maxTokens,
-      });
+      };
+      if (jsonMode) {
+        params.response_format = { type: 'json_object' };
+      }
+      const res = await openai.chat.completions.create(params);
       return res.choices[0].message.content;
     },
   };

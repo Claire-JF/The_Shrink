@@ -1,0 +1,14 @@
+{
+  "name": "the-shrink-brain",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Backend-2 AI logic layer for The Shrink",
+  "scripts": {
+    "test:stability": "node tests/stability-test.js",
+    "test:quick": "node tests/stability-test.js --runs=3"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "openai": "^4.86.2"
+  }
+}
