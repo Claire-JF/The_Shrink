@@ -177,6 +177,9 @@ function showWindow() {
   if (!mainWindow) return;
   mainWindow.show();
   mainWindow.focus();
+  if (typeof mainWindow.moveTop === 'function') {
+    mainWindow.moveTop();
+  }
 }
 
 /**
@@ -189,6 +192,9 @@ function showWindowInactive() {
     mainWindow.showInactive();
   } else {
     mainWindow.show();
+  }
+  if (typeof mainWindow.moveTop === 'function') {
+    mainWindow.moveTop();
   }
 }
 

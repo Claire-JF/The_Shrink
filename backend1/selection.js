@@ -4,6 +4,8 @@
  * 2) Fall back: save clipboard → Ctrl+C → read clipboard → restore.
  * Set MOCK_SELECTION=1 or config.mockSelection for stub (no OS automation).
  *
+ * Linux/macOS: real capture is not implemented yet — returns empty text unless MOCK_SELECTION.
+ *
  * Set DISABLE_UIA_SELECTION=1 to skip UIA and use clipboard copy only.
  */
 const path = require('path');
@@ -110,11 +112,12 @@ async function captureSelection() {
     }
   }
 
-  const err = new Error(
-    'Selection capture uses UI Automation + clipboard on Windows only in this build. Use MOCK_SELECTION=1.'
+  /* Linux/macOS: no SendKeys/UIA path in this build — return empty and still let the widget open.
+     Users should select text in a real app (not the terminal); optional MOCK_SELECTION=1 for demos. */
+  logger.warn(
+    'selection: non-Windows — empty capture (MOCK_SELECTION=1 for stub text). Avoid triggering hotkeys from the terminal.'
   );
-  err.code = 'PLATFORM_UNSUPPORTED';
-  throw err;
+  return { text: '', sourceApp: 'unsupported' };
 }
 
 module.exports = {

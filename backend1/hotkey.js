@@ -39,11 +39,12 @@ function registerFirstWorking(label, accelerators, fn) {
 function register(handlers) {
   if (registered) return;
 
-  // Ctrl+R / Cmd+R is often taken by GPU overlays, IME, VMs, IDE globals, etc. Try fallbacks on Windows.
-  const shrinkChain =
-    process.platform === 'win32'
-      ? ['CommandOrControl+R', 'Control+Alt+R', 'CommandOrControl+Shift+R']
-      : ['CommandOrControl+R'];
+  // Ctrl+R / Cmd+R is often taken by GPU overlays, IME, terminals (reverse search), IDEs, etc.
+  const shrinkChain = [
+    'CommandOrControl+R',
+    'Control+Alt+R',
+    'CommandOrControl+Shift+R',
+  ];
   registerFirstWorking('shrink', shrinkChain, handlers.onShrinkTrigger);
 
   const forcedChain =
@@ -53,7 +54,7 @@ function register(handlers) {
           'CommandOrControl+Shift+Y',
           'CommandOrControl+Alt+Shift+S',
         ]
-      : ['CommandOrControl+Shift+S'];
+      : ['CommandOrControl+Shift+S', 'CommandOrControl+Alt+S'];
   registerFirstWorking('forced', forcedChain, handlers.onForcedTrigger);
 
   registerFirstWorking('demo-toggle', ['CommandOrControl+Shift+D'], handlers.onDemoToggle);
