@@ -45,10 +45,10 @@ async function score(text) {
   return mod.score(text, client, llmConfig);
 }
 
-async function optimize(text, scoreResult) {
+async function optimize(text, scoreResult, options) {
   await initBrain();
   const mod = await loadIndex();
-  return mod.optimize(text, scoreResult, client, llmConfig);
+  return mod.optimize(text, scoreResult, client, llmConfig, options || {});
 }
 
 /**

@@ -67,6 +67,61 @@ ul {
   display: none !important;
 }
 
+.safety-banner {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #ffc9a3;
+  background: linear-gradient(90deg, #3d2418 0%, #2a1820 100%);
+  border-bottom: 1px solid #c45c38;
+}
+
+.safety-banner.hidden {
+  display: none !important;
+}
+
+.protect-hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #8b93a7;
+}
+
+.original-host {
+  min-height: 160px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.original-host:focus {
+  outline: 1px solid #533afd;
+  outline-offset: 1px;
+}
+
+.orig-prot {
+  cursor: pointer;
+  background: rgba(72, 126, 245, 0.38);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.optimized-host {
+  min-height: 160px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.opt-protected {
+  background: rgba(72, 126, 245, 0.22);
+  border-bottom: 2px solid #7b93ff;
+  border-radius: 2px;
+}
+
 .stage {
   position: relative;
   height: calc(100% - 84px);

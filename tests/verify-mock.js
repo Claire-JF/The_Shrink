@@ -6,7 +6,7 @@ import { warmup } from '../src/warmup.js';
 const client = createMockClient();
 const config = { fastModel: 'Qwen2.5 7B', deepModel: 'Qwen2.5 72B' };
 
-console.log('=== Mock Client Verification (INTEGRATION_CONTRACT 5 dimensions) ===\n');
+console.log('=== Mock Client Verification (INTEGRATION_CONTRACT 5 dimensions + optimize extras) ===\n');
 
 // 1. Warmup
 console.log('1. warmup()');
@@ -37,16 +37,30 @@ console.log(`   Summary is string: ${summaryIsString ? 'OK' : 'FAIL'}\n`);
 
 // 3. Optimize
 console.log('3. optimize()');
-const optResult = await optimize('Vague test text', scoreResult, client, config);
+const optResult = await optimize('Vague test text', scoreResult, client, config, {
+  protectedRegions: [],
+});
 console.log('   Result:', JSON.stringify(optResult, null, 2));
 
 const hasOptText = typeof optResult.optimizedText === 'string' && optResult.optimizedText.length > 0;
 const hasChanges = Array.isArray(optResult.changes) && optResult.changes.every((c) => typeof c === 'string');
+const booOk = typeof optResult.safetyOverride === 'boolean';
+const prOk = Array.isArray(optResult.protectedRegions);
 
 console.log(`   optimizedText is non-empty string: ${hasOptText ? 'OK' : 'FAIL'}`);
-console.log(`   changes is string[]: ${hasChanges ? 'OK' : 'FAIL'}\n`);
+console.log(`   changes is string[]: ${hasChanges ? 'OK' : 'FAIL'}`);
+console.log(`   safetyOverride is boolean: ${booOk ? 'OK' : 'FAIL'}`);
+console.log(`   protectedRegions is array: ${prOk ? 'OK' : 'FAIL'}\n`);
 
 // Summary
-const allPassed = missingScoreKeys.length === 0 && allScoreNumbers && summaryIsString && hasOptText && hasChanges;
+const allPassed =
+  missingScoreKeys.length === 0 &&
+  allScoreNumbers &&
+  summaryIsString &&
+  hasOptText &&
+  hasChanges &&
+  booOk &&
+  prOk;
+
 console.log(`=== ${allPassed ? 'ALL CHECKS PASSED' : 'SOME CHECKS FAILED'} ===`);
 process.exit(allPassed ? 0 : 1);

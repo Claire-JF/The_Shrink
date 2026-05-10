@@ -21,7 +21,7 @@ const CHANNEL = {
 
 contextBridge.exposeInMainWorld('shrink', {
   captureSelection: (opts) => ipcRenderer.invoke(CHANNEL.CAPTURE, opts ?? {}),
-  generateOptimized: () => ipcRenderer.invoke(CHANNEL.GENERATE),
+  generateOptimized: (payload) => ipcRenderer.invoke(CHANNEL.GENERATE, payload ?? {}),
   copyToClipboard: (payload) => ipcRenderer.invoke(CHANNEL.COPY, payload ?? {}),
   replaceWithOptimized: () => ipcRenderer.invoke(CHANNEL.REPLACE),
   closeWidget: () => ipcRenderer.invoke(CHANNEL.CLOSE),

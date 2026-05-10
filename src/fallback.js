@@ -14,5 +14,7 @@ export function getDefaultOptimization(originalText) {
   return {
     optimizedText: typeof originalText === 'string' ? originalText : '',
     changes: [],
+    safetyOverride: false,
+    protectedRegions: [],
   };
 }

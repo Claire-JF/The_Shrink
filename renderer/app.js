@@ -1,5 +1,10 @@
 /* global shrink */
 
+/** Source text for the captured prompt (single source for offsets). */
+let sourcePlain = '';
+/** Half-open intervals merged & clamped — user-defined protected spans. */
+let userProtectedRegions = [];
+
 function $(id) {
   return document.getElementById(id);
 }
@@ -16,6 +21,150 @@ function setBusyOverlay(visible, message) {
   overlay.classList.toggle('hidden', !visible);
   overlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
   msgEl.textContent = message || 'Please wait…';
+}
+
+function normalizeRegions(raw, length) {
+  if (!length) return [];
+  const rows = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!r || typeof r !== 'object') continue;
+    const s = Number(r.start);
+    const e = Number(r.end);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    const start = Math.max(0, Math.min(length, Math.floor(s)));
+    const end = Math.max(0, Math.min(length, Math.ceil(e)));
+    if (end > start) rows.push({ start, end });
+  }
+  rows.sort((a, b) => a.start - b.start);
+  /** @type {{ start: number; end: number }[]} */
+  const merged = [];
+  for (const r of rows) {
+    const prev = merged[merged.length - 1];
+    if (!prev || r.start > prev.end) merged.push({ ...r });
+    else prev.end = Math.max(prev.end, r.end);
+  }
+  return merged;
+}
+
+function mergeUserInterval(start, end) {
+  sourcePlain = sourcePlain || '';
+  const len = sourcePlain.length;
+  if (!(end > start) || len < 1) return;
+  const next = [...userProtectedRegions, { start, end }];
+  userProtectedRegions = normalizeRegions(next, len);
+  renderOriginalHost();
+}
+
+function removeProtBySpan(span) {
+  const s = Number(span.dataset.protStart);
+  const e = Number(span.dataset.protEnd);
+  userProtectedRegions = userProtectedRegions.filter((r) => !(r.start === s && r.end === e));
+  renderOriginalHost();
+}
+
+function appendTextFragment(el, str) {
+  el.appendChild(document.createTextNode(str));
+}
+
+/** @param {HTMLElement} host */
+function getSelectionOffsetsIn(host) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed || !host) return null;
+
+  const range = sel.getRangeAt(0);
+  if (!host.contains(range.commonAncestorContainer)) return null;
+
+  const pre = document.createRange();
+  pre.selectNodeContents(host);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = pre.toString().length;
+  const selected = range.toString();
+  const end = start + selected.length;
+
+  if (!(end > start)) return null;
+  if (start >= 0 && end <= sourcePlain.length && sourcePlain.slice(start, end) === selected) {
+    return { start, end };
+  }
+
+  /** Rare layout drift — substring search fallback */
+  const idx = sourcePlain.indexOf(selected);
+  if (idx !== -1) return { start: idx, end: idx + selected.length };
+
+  return null;
+}
+
+/** Render original column with clickable protected spans */
+function renderOriginalHost() {
+  const host = $('originalHost');
+  if (!host) return;
+  host.innerHTML = '';
+  sourcePlain = sourcePlain ?? '';
+  if (!sourcePlain) {
+    appendTextFragment(host, '—');
+    return;
+  }
+  const regs = normalizeRegions(userProtectedRegions, sourcePlain.length);
+  userProtectedRegions = regs;
+  let cursor = 0;
+  for (const r of regs) {
+    appendTextFragment(host, sourcePlain.slice(cursor, r.start));
+    const span = document.createElement('span');
+    span.className = 'orig-prot';
+    span.dataset.protStart = String(r.start);
+    span.dataset.protEnd = String(r.end);
+    span.textContent = sourcePlain.slice(r.start, r.end);
+    span.title = '单击取消保留';
+    host.appendChild(span);
+    cursor = r.end;
+  }
+  appendTextFragment(host, sourcePlain.slice(cursor));
+}
+
+/**
+ * Sorted non-overlapping intervals for highlighting optimized output (model coordinates).
+ * @param {{ start: number; end: number }[]} regions
+ */
+function sortCleanRegions(length, regions) {
+  /** @type {{ start: number; end: number }[]} */
+  const rows = [];
+  for (const r of Array.isArray(regions) ? regions : []) {
+    if (!r || typeof r !== 'object') continue;
+    let s = Math.max(0, Math.floor(Number(r.start)));
+    let e = Math.max(0, Math.ceil(Number(r.end)));
+    if (!(e > s)) continue;
+    s = Math.min(length, Math.max(0, s));
+    e = Math.min(length, Math.max(0, e));
+    if (e > s) rows.push({ start: s, end: e });
+  }
+  rows.sort((a, b) => a.start - b.start);
+  /** Merge overlaps for clearer paint */
+  /** @type {{ start: number; end: number }[]} */
+  const merged = [];
+  for (const r of rows) {
+    const prev = merged[merged.length - 1];
+    if (!prev || r.start > prev.end) merged.push({ ...r });
+    else prev.end = Math.max(prev.end, r.end);
+  }
+  return merged;
+}
+
+function renderOptimizedHost(fullText, protectedRegionsMeta) {
+  const el = $('optimized');
+  if (!el) return;
+  el.innerHTML = '';
+
+  const L = typeof fullText === 'string' ? fullText.length : 0;
+  const regs = sortCleanRegions(L, protectedRegionsMeta);
+  let cursor = 0;
+  for (const r of regs) {
+    appendTextFragment(el, fullText.slice(cursor, r.start));
+    const span = document.createElement('span');
+    span.className = 'opt-protected';
+    span.textContent = fullText.slice(r.start, r.end);
+    el.appendChild(span);
+    cursor = r.end;
+  }
+  appendTextFragment(el, fullText.slice(cursor));
 }
 
 const DIM_KEYS = ['clarity', 'specificity', 'safety', 'tone', 'actionability'];
@@ -76,14 +225,33 @@ function pickOptimizedText(opt) {
   return '';
 }
 
+function applySafetyBanner(visible, message) {
+  const b = $('safetyBanner');
+  if (!b) return;
+  b.classList.toggle('hidden', !visible);
+  if (visible) {
+    b.textContent =
+      message || '因安全评分低于 2.0，本轮已忽略您在原文中标记的保护区域，并对全文作了改写。';
+  } else {
+    b.textContent = '';
+  }
+}
+
 function showLoadingState() {
+  sourcePlain = '';
+  userProtectedRegions = [];
+  applySafetyBanner(false, '');
   $('rightTitle').textContent = '';
   $('optimized').classList.add('hidden');
   $('btnCopy').classList.add('hidden');
   $('btnReplace').classList.add('hidden');
   $('changes').classList.add('hidden');
   $('flags').classList.add('hidden');
-  $('original').textContent = '…';
+  const host = $('originalHost');
+  if (host) {
+    host.innerHTML = '';
+    appendTextFragment(host, '…');
+  }
   setScore(null);
   $('btnGenerate').disabled = true;
   setBusyOverlay(true, 'Reading selection & scoring…');
@@ -91,6 +259,7 @@ function showLoadingState() {
 
 function showState1(payload) {
   setBusyOverlay(false);
+  applySafetyBanner(false, '');
   $('rightTitle').textContent = 'Score';
   $('optimized').classList.add('hidden');
   $('btnCopy').classList.add('hidden');
@@ -98,11 +267,16 @@ function showState1(payload) {
   $('flags').classList.remove('hidden');
   $('changes').classList.add('hidden');
 
-  let text = payload.capturedText || '';
+  let text = typeof payload?.capturedText === 'string' ? payload.capturedText : '';
   if (payload.error) {
     text = `(Error) ${payload.error}${text ? `\n${text}` : ''}`.trim();
   }
-  $('original').textContent = text || '(empty capture)';
+
+  sourcePlain = text || '';
+  userProtectedRegions = [];
+  $('originalHost').focus({ preventScroll: true });
+  renderOriginalHost();
+
   setScore(payload.score);
   renderScoreDetails(payload.score);
   $('btnGenerate').disabled = false;
@@ -115,7 +289,26 @@ function showState2(opt) {
   $('optimized').classList.remove('hidden');
   $('btnCopy').classList.remove('hidden');
   $('btnReplace').classList.remove('hidden');
-  $('optimized').textContent = pickOptimizedText(opt);
+
+  applySafetyBanner(!!opt.safetyOverride);
+
+  const full = pickOptimizedText(opt);
+  const pr = opt && Array.isArray(opt.protectedRegions) ? opt.protectedRegions : [];
+  const coords = pr.map((p) =>
+    p && typeof p === 'object'
+      ? { start: Number(p.start), end: Number(p.end) }
+      : { start: 0, end: 0 },
+  );
+
+  if (full && opt?.safetyOverride) {
+    $('optimized').innerHTML = '';
+    $('optimized').textContent = full;
+  } else if (full) {
+    renderOptimizedHost(full, coords);
+  } else {
+    $('optimized').innerHTML = '';
+  }
+
   renderChanges(opt);
   $('btnGenerate').disabled = true;
 }
@@ -129,6 +322,29 @@ async function refreshConfigBanner() {
     badge.classList.toggle('llm-mock', !cfg.llmConfigured);
     badge.textContent = cfg.llmConfigured ? 'CLōD' : 'MOCK LLM';
   }
+}
+
+function wireProtectedSelectionUI() {
+  const host = $('originalHost');
+  if (!host) return;
+
+  host.addEventListener('click', (e) => {
+    const prot = e.target.closest('.orig-prot');
+    if (prot && host.contains(prot)) {
+      e.preventDefault();
+      removeProtBySpan(prot);
+    }
+  });
+
+  host.addEventListener('mouseup', () => {
+    requestAnimationFrame(() => {
+      if (!sourcePlain.trim()) return;
+      const offsets = getSelectionOffsetsIn(host);
+      const sel = window.getSelection();
+      if (offsets) mergeUserInterval(offsets.start, offsets.end);
+      if (sel && typeof sel.removeAllRanges === 'function') sel.removeAllRanges();
+    });
+  });
 }
 
 async function bootstrap() {
@@ -147,17 +363,23 @@ async function bootstrap() {
     }
   });
 
+  wireProtectedSelectionUI();
+
   $('btnClose').addEventListener('click', () => shrink.closeWidget());
 
   $('btnGenerate').addEventListener('click', async () => {
     $('btnGenerate').disabled = true;
     setBusyOverlay(true, 'Optimizing prompt…');
+    const regionsPayload = normalizeRegions(userProtectedRegions, sourcePlain.length);
+    userProtectedRegions = regionsPayload;
+
     let result;
     try {
-      result = await shrink.generateOptimized();
+      result = await shrink.generateOptimized({ protectedRegions: regionsPayload });
     } finally {
       setBusyOverlay(false);
     }
+
     const body = pickOptimizedText(result);
     if (body) {
       showState2(result);
@@ -165,6 +387,7 @@ async function bootstrap() {
       $('btnGenerate').disabled = false;
       $('btnReplace').classList.add('hidden');
       $('optimized').classList.remove('hidden');
+      $('optimized').innerHTML = '';
       $('optimized').textContent = 'Generate failed or empty result';
     }
   });
@@ -204,5 +427,9 @@ async function bootstrap() {
 }
 
 bootstrap().catch((e) => {
-  $('original').textContent = String(e && e.message ? e.message : e);
+  const host = $('originalHost');
+  if (host) {
+    host.innerHTML = '';
+    host.textContent = String(e && e.message ? e.message : e);
+  }
 });

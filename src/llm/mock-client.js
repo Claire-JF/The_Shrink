@@ -2,8 +2,9 @@
  * In-process mock (no HTTP). Same return shapes as real LLM (INTEGRATION_CONTRACT).
  * Score responses use simple keyword tiers so CLI tests pass without live API keys.
  */
+import { extractOriginalPayloadFromUserContent } from '../protected-regions.js';
 
-const MOCK_OPTIMIZED = JSON.stringify({
+const MOCK_OPTIMIZED_BODY = JSON.stringify({
   optimizedText:
     'Could you please review the Q3 marketing budget spreadsheet we discussed on Monday? I need your feedback on the projected costs by end of day Friday so we can finalize the plan before the team meeting next Tuesday.',
   changes: [
@@ -11,6 +12,8 @@ const MOCK_OPTIMIZED = JSON.stringify({
     'Added concrete deadline instead of "soon"',
     'Specified what "good" means in context',
   ],
+  safetyOverride: false,
+  protectedRegions: [],
 });
 
 const MOCK_WARMUP = 'OK';
@@ -65,9 +68,38 @@ export function createMockClient() {
         const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
         return `Mock助手：我听到的是「${String(lastUser).slice(0, 120)}…」。这是占位回复；配置真实 API Key 后会走真模型连贯对话。`;
       }
-      // optimize() uses jsonMode + temperature 0.2; scorer uses 0 — avoid matching "rewrite" in system prompt.
+
       if (opts.jsonMode && Number(opts.temperature) > 0.1) {
-        return MOCK_OPTIMIZED;
+        const plainFromB64 = extractOriginalPayloadFromUserContent(content);
+        const safetyMatch = content.match(/"safety"\s*:\s*([\d.]+)/);
+        const safetyVal = safetyMatch ? Number(safetyMatch[1]) : 3;
+
+        if (Number.isFinite(safetyVal) && safetyVal < 2) {
+          const body =
+            plainFromB64.trim() ||
+            'Could you please review the Q3 marketing budget spreadsheet we discussed on Monday?';
+          return JSON.stringify({
+            optimizedText: `[MOCK safety rewrite — full text] ${body}`,
+            changes: ['Removed harmful content (safety override: protected regions ignored)'],
+            safetyOverride: true,
+            protectedRegions: [],
+          });
+        }
+
+        /** Decoded originals let downstream reconcile verbatim spans toward protectedRegions */
+        if (plainFromB64.length > 0) {
+          return JSON.stringify({
+            optimizedText: plainFromB64,
+            changes: [
+              'Mock: kept protected spans verbatim via identical optimizedText baseline',
+              'Live model would edit only unprotected wording',
+            ],
+            safetyOverride: false,
+            protectedRegions: [],
+          });
+        }
+
+        return MOCK_OPTIMIZED_BODY;
       }
 
       const tier = detectScoreTier(content);

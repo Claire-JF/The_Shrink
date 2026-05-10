@@ -45,6 +45,55 @@ export function validateScore(obj) {
   };
 }
 
+/**
+ * Normalize model-provided protected spans against optimized output.
+ */
+function cleanProtectedRegions(optimizedText, regions) {
+  const L = optimizedText.length;
+  /** @type {{ start: number; end: number; originalText: string }[]} */
+  const out = [];
+
+  for (const p of Array.isArray(regions) ? regions : []) {
+    if (!p || typeof p !== 'object') continue;
+
+    let start = Number(p.start);
+    let end = Number(p.end);
+    const originalText =
+      typeof p.originalText === 'string'
+        ? p.originalText
+        : typeof p.original_text === 'string'
+          ? p.original_text
+          : '';
+
+    /** Repair coordinates using originalText when needed */
+    if (
+      originalText &&
+      (!Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        end <= start ||
+        optimizedText.slice(Math.floor(start), Math.ceil(end)) !== originalText)
+    ) {
+      const idx = optimizedText.indexOf(originalText);
+      if (idx === -1) continue;
+      start = idx;
+      end = idx + originalText.length;
+    }
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+
+    const s = Math.max(0, Math.min(L, Math.floor(start)));
+    const e = Math.max(0, Math.min(L, Math.ceil(end)));
+    if (e <= s) continue;
+
+    const slice = optimizedText.slice(s, e);
+    if (originalText && slice !== originalText) continue;
+
+    out.push({ start: s, end: e, originalText: originalText || slice });
+  }
+
+  return out;
+}
+
 export function validateOptimized(obj) {
   const errors = [];
 
@@ -64,11 +113,31 @@ export function validateOptimized(obj) {
     return { valid: false, data: null, errors };
   }
 
+  const safetyOverride =
+    typeof obj.safetyOverride === 'boolean'
+      ? obj.safetyOverride
+      : typeof obj.safety_override === 'boolean'
+        ? obj.safety_override
+        : false;
+
+  const optimizedText = obj.optimizedText;
+
+  /** @type {unknown[]} */
+  const pr = Array.isArray(obj.protectedRegions)
+    ? obj.protectedRegions
+    : Array.isArray(obj.protected_regions)
+      ? obj.protected_regions
+      : [];
+
+  const protectedRegions = cleanProtectedRegions(optimizedText, pr);
+
   return {
     valid: true,
     data: {
-      optimizedText: obj.optimizedText,
+      optimizedText,
       changes: obj.changes,
+      safetyOverride,
+      protectedRegions,
     },
     errors: [],
   };

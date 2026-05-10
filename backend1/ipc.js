@@ -96,11 +96,17 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle(CHANNEL.GENERATE, async () => {
+  ipcMain.handle(CHANNEL.GENERATE, async (_e, payload) => {
     const text = state.getSelection();
     const scoreResult = state.getScore();
-    logger.info('IPC generate-optimized', { textLength: text.length });
-    const optimized = await brain.optimize(text, scoreResult);
+    const protectedRegions = Array.isArray(payload?.protectedRegions)
+      ? payload.protectedRegions
+      : [];
+    logger.info('IPC generate-optimized', {
+      textLength: text.length,
+      protectedRegions: protectedRegions.length,
+    });
+    const optimized = await brain.optimize(text, scoreResult, { protectedRegions });
     state.setOptimized(optimized);
     return optimized;
   });
