@@ -71,6 +71,7 @@ function showState1(payload) {
   $('rightTitle').textContent = 'Score';
   $('optimized').classList.add('hidden');
   $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
   $('flags').classList.remove('hidden');
   $('changes').classList.add('hidden');
 
@@ -86,6 +87,7 @@ function showState2(opt) {
   $('flags').classList.add('hidden');
   $('optimized').classList.remove('hidden');
   $('btnCopy').classList.remove('hidden');
+  $('btnReplace').classList.remove('hidden');
   $('optimized').textContent = pickOptimizedText(opt);
   renderChanges(opt);
   $('btnGenerate').disabled = true;
@@ -125,6 +127,7 @@ async function bootstrap() {
       showState2(result);
     } else {
       $('btnGenerate').disabled = false;
+      $('btnReplace').classList.add('hidden');
       $('optimized').classList.remove('hidden');
       $('optimized').textContent = 'Generate failed or empty result';
     }
@@ -139,6 +142,20 @@ async function bootstrap() {
     setTimeout(() => {
       b.textContent = prev;
     }, 900);
+  });
+
+  $('btnReplace').addEventListener('click', async () => {
+    const b = $('btnReplace');
+    b.disabled = true;
+    try {
+      const r = await shrink.replaceWithOptimized();
+      if (!r || r.ok === false) {
+        b.disabled = false;
+        return;
+      }
+    } catch {
+      b.disabled = false;
+    }
   });
 
   $('btnLog').addEventListener('click', () => shrink.openLog());

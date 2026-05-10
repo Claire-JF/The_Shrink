@@ -8,7 +8,6 @@ const brain = require('./brain');
 const windowMod = require('./window');
 const hotkey = require('./hotkey');
 const { registerIpc, runCaptureFlow } = require('./ipc');
-const mockPlaceholderShell = require('./mock-placeholder-shell');
 
 function sendCaptureWhenReady(win, result) {
   const send = () => {
@@ -77,10 +76,6 @@ async function initBackend1() {
         });
       }
     },
-    onOpenWorkbench: () => {
-      mockPlaceholderShell.toggleOrFocusMockUi();
-      logger.info('mock placeholders shown');
-    },
   });
 
   logger.info('Backend-1 initialized', {
@@ -91,7 +86,6 @@ async function initBackend1() {
 
 function disposeBackend1() {
   hotkey.unregister();
-  mockPlaceholderShell.destroyMockShell();
   windowMod.destroyWindow();
 }
 

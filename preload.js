@@ -13,8 +13,7 @@ const CHANNEL = {
   OPEN_LOG: 'shrink:open-log',
   SCORE_LIVE: 'shrink:score-live',
   CHAT_SEND: 'shrink:chat-send',
-  MOCK_BAR_RESIZE: 'mock-ui:resize-bar',
-  MOCK_DISMISS: 'mock-ui:dismiss-shell',
+  REPLACE: 'shrink:replace-with-optimized',
   FORWARD_PROMPT: 'shrink:forward-prompt',
   FORWARD_PREFS_GET: 'shrink:forward-prefs-get',
   FORWARD_PREFS_SET: 'shrink:forward-prefs-set',
@@ -24,6 +23,7 @@ contextBridge.exposeInMainWorld('shrink', {
   captureSelection: (opts) => ipcRenderer.invoke(CHANNEL.CAPTURE, opts ?? {}),
   generateOptimized: () => ipcRenderer.invoke(CHANNEL.GENERATE),
   copyToClipboard: (payload) => ipcRenderer.invoke(CHANNEL.COPY, payload ?? {}),
+  replaceWithOptimized: () => ipcRenderer.invoke(CHANNEL.REPLACE),
   closeWidget: () => ipcRenderer.invoke(CHANNEL.CLOSE),
   getState: () => ipcRenderer.invoke(CHANNEL.GET_STATE),
   getConfig: () => ipcRenderer.invoke(CHANNEL.GET_CONFIG),
@@ -45,23 +45,5 @@ contextBridge.exposeInMainWorld('shrink', {
     };
     ipcRenderer.on('shrink:presentation', handler);
     return () => ipcRenderer.removeListener('shrink:presentation', handler);
-  },
-});
-
-contextBridge.exposeInMainWorld('mockShell', {
-  telemetry: (payload) => ipcRenderer.send('mock-ui:telemetry', payload),
-  resizeBar: (heightPx) => ipcRenderer.invoke(CHANNEL.MOCK_BAR_RESIZE, { heightPx }),
-  dismissBoth: () => ipcRenderer.invoke(CHANNEL.MOCK_DISMISS),
-  subscribeOrb: (callback) => {
-    if (typeof callback !== 'function') return () => {};
-    const wrapped = (_event, payload) => {
-      try {
-        callback(payload);
-      } catch {
-        /* ignore */
-      }
-    };
-    ipcRenderer.on('mock-ui:orbit', wrapped);
-    return () => ipcRenderer.removeListener('mock-ui:orbit', wrapped);
   },
 });

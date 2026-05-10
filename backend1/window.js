@@ -37,7 +37,7 @@ function createWindow() {
 
   const cursor = getCursorPointOrCenter();
   const width = 620;
-  const height = 320;
+  const height = 348;
 
   mainWindow = new BrowserWindow({
     width,

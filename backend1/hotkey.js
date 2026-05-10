@@ -35,7 +35,6 @@ function registerFirstWorking(label, accelerators, fn) {
  * @param {() => void | Promise<void>} handlers.onShrinkTrigger  Cmd/Ctrl+R
  * @param {() => void | Promise<void>} handlers.onForcedTrigger   Cmd/Ctrl+Shift+S (fallbacks on Windows if busy)
  * @param {() => void | Promise<void>} handlers.onDemoToggle      Cmd/Ctrl+Shift+D
- * @param {() => void | Promise<void>} [handlers.onOpenWorkbench] Ctrl+Shift+W — dual mock UI shell
  */
 function register(handlers) {
   if (registered) return;
@@ -53,14 +52,6 @@ function register(handlers) {
   registerFirstWorking('forced', forcedChain, handlers.onForcedTrigger);
 
   registerFirstWorking('demo-toggle', ['CommandOrControl+Shift+D'], handlers.onDemoToggle);
-
-  if (handlers.onOpenWorkbench) {
-    registerFirstWorking(
-      'mock-ui-shell',
-      ['CommandOrControl+Shift+W'],
-      handlers.onOpenWorkbench
-    );
-  }
 
   registered = true;
 }
