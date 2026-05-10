@@ -55,12 +55,15 @@ async function runCaptureFlow({ forced }) {
   state.setOptimized(null);
 
   const total = scoreResult && scoreResult.total != null ? scoreResult.total : null;
-  const open = forced || shouldOpenWidget(total);
+  // Always show the hover UI after capture: high-scoring prompts used to suppress the window
+  // and felt like Ctrl+R did nothing. Threshold/demo flags still drive the DEMO badge only.
+  const open = true;
 
   logger.info('capture-selection done', {
     textLength: text.length,
     total,
     open,
+    meetsExpandThreshold: shouldOpenWidget(total),
     forced,
     demoMode: config.get('demoMode'),
   });
