@@ -39,7 +39,12 @@ function registerFirstWorking(label, accelerators, fn) {
 function register(handlers) {
   if (registered) return;
 
-  registerFirstWorking('shrink', ['CommandOrControl+R'], handlers.onShrinkTrigger);
+  // Ctrl+R / Cmd+R is often taken by GPU overlays, IME, VMs, IDE globals, etc. Try fallbacks on Windows.
+  const shrinkChain =
+    process.platform === 'win32'
+      ? ['CommandOrControl+R', 'Control+Alt+R', 'CommandOrControl+Shift+R']
+      : ['CommandOrControl+R'];
+  registerFirstWorking('shrink', shrinkChain, handlers.onShrinkTrigger);
 
   const forcedChain =
     process.platform === 'win32'
