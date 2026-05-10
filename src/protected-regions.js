@@ -98,6 +98,15 @@ export function protectedSlicesAppearVerbatim(originalPlain, optimizedText, merg
   return true;
 }
 
+/**
+ * Remove optional model leak of sentinel tags from optimized text.
+ */
+export function stripProtectedMarkers(text) {
+  return String(text ?? '')
+    .replace(/<<\s*\/\s*PROTECTED\s*>>/gi, '')
+    .replace(/<<\s*PROTECTED\s*>>/gi, '');
+}
+
 export function extractOriginalPayloadFromUserContent(userMsg) {
   const m =
     typeof userMsg === 'string'

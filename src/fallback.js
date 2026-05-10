@@ -10,11 +10,11 @@ export function getDefaultScore() {
   };
 }
 
-export function getDefaultOptimization(originalText) {
+export function getDefaultOptimization(originalText, safetyOverride = false) {
   return {
     optimizedText: typeof originalText === 'string' ? originalText : '',
     changes: [],
-    safetyOverride: false,
+    safetyOverride,
     protectedRegions: [],
   };
 }

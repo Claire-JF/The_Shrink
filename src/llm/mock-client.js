@@ -1,16 +1,20 @@
 /**
  * In-process mock (no HTTP). Same return shapes as real LLM (INTEGRATION_CONTRACT).
- * Score responses use simple keyword tiers so CLI tests pass without live API keys.
+ * Score tiers + optimize branch that understands <<<SHR_ORIG_B64>>> block.
  */
 import { extractOriginalPayloadFromUserContent } from '../protected-regions.js';
 
 const MOCK_OPTIMIZED_BODY = JSON.stringify({
   optimizedText:
-    'Could you please review the Q3 marketing budget spreadsheet we discussed on Monday? I need your feedback on the projected costs by end of day Friday so we can finalize the plan before the team meeting next Tuesday.',
+    '**Role:** You are a project coordinator reviewing a shared document.\n\n' +
+    '**Task:** Review the Q3 marketing budget spreadsheet we discussed on Monday.\n\n' +
+    '**Constraints:**\n- Focus on projected costs\n- Provide feedback by end of day Friday\n- Flag items over budget\n\n' +
+    '**Output Format:** Bullet-point list of concerns and suggestions.',
   changes: [
+    'Restructured into AI-Intent format (Role / Task / Constraints / Output Format)',
     'Replaced vague reference "the thing" with specific subject',
     'Added concrete deadline instead of "soon"',
-    'Specified what "good" means in context',
+    'Specified expected output format',
   ],
   safetyOverride: false,
   protectedRegions: [],
@@ -86,13 +90,12 @@ export function createMockClient() {
           });
         }
 
-        /** Decoded originals let downstream reconcile verbatim spans toward protectedRegions */
         if (plainFromB64.length > 0) {
           return JSON.stringify({
             optimizedText: plainFromB64,
             changes: [
               'Mock: kept protected spans verbatim via identical optimizedText baseline',
-              'Live model would edit only unprotected wording',
+              'Live model would restyle unprotected parts with AI-Intent structure',
             ],
             safetyOverride: false,
             protectedRegions: [],

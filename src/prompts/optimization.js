@@ -1,55 +1,95 @@
-import { annotateProtectedOriginal } from '../protected-regions.js';
+export const OPTIMIZATION_SYSTEM_PROMPT = `You are a prompt architect. Transform the user's raw prompt into the most effective format for AI consumption, while respecting spans they marked as protected.
 
-export const OPTIMIZATION_SYSTEM_PROMPT = `You rewrite text into a clear, executable agent-ready instruction. Preserve intent; add scope, success criteria, and safety when missing.
+## AI-Intent output pattern (non-protected prose)
 
-The five quality dimensions (0–5, higher = better): clarity, specificity, safety, tone, actionability.
+Restructure editable parts into this pattern where useful:
 
-RULES:
-- Focus on the weakest dimensions (typically those below 3.0).
-- When the prompt includes substrings wrapped in [KEEP]...[/KEEP], those substring contents MUST appear VERBATIM, unchanged, inside optimizedText — unless SAFETY OVERRIDE is stated, in which case you ignore keepers and rewrite freely for safety.
-- List 2–5 specific bullets in "changes".
-- Respond with ONLY valid JSON (required keys below; no markdown).`;
+1. **Role & Context** — Who should the AI act as? What background does it need?
+2. **Task** — One clear sentence for the core request.
+3. **Constraints** — Bullet list of requirements, scope, or style.
+4. **Output Format** — Expected answer shape (paragraph, list, code, table, etc.).
+5. **Examples** (optional) — Surface implicit patterns from the original.
+
+Omit sections that do not apply — avoid boilerplate.
+
+## User score JSON (always inspect)
+
+The user includes a Scores object with five numeric dimensions (0–5): clarity, specificity, safety, tone, actionability. Prefer improving the weakest. Manipulative tone issues map to **Tone** and **Safety**.
+
+## Protected regions (<<PROTECTED>>...<</PROTECTED>>)
+
+The user message may include markers around selected phrases. Rules:
+
+- Copy protected text **verbatim** into optimizedText — no rephrase, translation, or spelling "fixes" inside the marked span.
+- Smoothly edit only the **unmarked** text so the full prompt reads well as a whole.
+- Keep protected segments in roughly the same order/position relative to the whole.
+- If no markers are present (or SAFETY OVERRIDE applies), rewrite freely.
+
+## Rewriting rules
+
+- When **Safety** scores low: remove harmful or irreversible-risk requests; suggest safer alternatives for the legitimate goal.
+- When **Tone / actionability** scores low: strip manipulation and add concrete, executable detail.
+- Respond with **ONLY** valid JSON matching the keys the user lists (no markdown fences).`;
 
 /**
  * @param {string} text
  * @param {object|null|undefined} scoreResult
- * @param {{ effectiveRegions: {start:number,end:number}[], safetyOverride: boolean }} [ctx]
+ * @param {{ effectiveRegions: { start: number; end: number }[], safetyOverride: boolean }} ctx
  */
 export function buildOptimizationMessages(text, scoreResult, ctx = {}) {
   const orig = String(text ?? '');
   const b64 = Buffer.from(orig, 'utf8').toString('base64');
-  /** @type {{ start: number; end: number }[]} */
   const effective = ctx.effectiveRegions || [];
   const safetyOverride = !!ctx.safetyOverride;
   const summary = scoreResult && typeof scoreResult.summary === 'string' ? scoreResult.summary : '';
 
-  let user = '';
+  const markedForModel = applyProtectedMarkers(orig, effective);
 
-  user += `The original UTF-8 string as Base64 (for mocks / verification — decoding must match readable copy below).\n<<<SHR_ORIG_B64>>>\n${b64}\n<<<SHR_ORIG_END>>>\n\n`;
-  user += `Human-readable original (same string):\n${orig}\n\n`;
-  user += `Scores JSON:\n${JSON.stringify(scoreResult || {})}\n\n`;
-  user += `Main issue: ${summary}\n\n`;
+  const chunks = [];
+  chunks.push(
+    'The original UTF-8 string as Base64 (fixtures / verification — must decode to the plain text below).\n' +
+      `<<<SHR_ORIG_B64>>>\n${b64}\n<<<SHR_ORIG_END>>>\n`
+  );
+  chunks.push(`Plain original:\n${orig}\n`);
+  chunks.push(
+    `Same text with <<PROTECTED>> wrappers on user-selected spans (if any):\n${markedForModel}\n`
+  );
+  chunks.push(`Scores JSON:\n${JSON.stringify(scoreResult || {})}\n`);
+  chunks.push(`Main issue: ${summary}\n`);
 
   if (safetyOverride) {
-    user +=
-      'SAFETY OVERRIDE: safety score is below 2.0 — IGNORE all protected-region rules. Rewrite the FULL text as needed for safety.\nReturn "safetyOverride": true and "protectedRegions": []. Optionally note in "changes".\n\n';
-  } else if (effective.length) {
-    const annotated = annotateProtectedOriginal(orig, effective);
-    user += `Annotated reference — ONLY text inside [KEEP]...[/KEEP] must survive verbatim inside optimizedText. Improve everything else.\n${annotated}\n\n`;
-  } else {
-    user += `No explicit protected spans from the UI.\n\n`;
+    chunks.push(
+      'SAFETY OVERRIDE active (safety < 2.0): ignore ALL <<PROTECTED>> regions — rewrite the FULL prompt for safety. Set "safetyOverride": true and "protectedRegions": [].'
+    );
   }
 
-  user += `Respond with ONLY valid JSON with keys:
-- optimizedText (string, full rewritten prompt),
-- changes (array of strings, 2–5 items),
-- safetyOverride (boolean),
-- protectedRegions (array of { "start": number, "end": number, "originalText": string } pointing to UTF-16 indices inside optimizedText for each verbatim substring you preserved; use [] when none).
-
-If you preserved [KEEP] segments, list each verbatim occurrence in protectedRegions using exact substring text and correct indices into optimizedText.`;
+  chunks.push(
+    'Rewrite weaker areas using the AI-Intent pattern around any protected spans. Return ONLY JSON with keys:\n' +
+      '"optimizedText" (string),\n' +
+      '"changes" (array of 2–5 strings),\n' +
+      '"safetyOverride" (boolean),\n' +
+      '"protectedRegions" (array of { "start", "end", "originalText" } for each verbatim protected span in optimizedText, or []).\n' +
+      'Do not leave <<PROTECTED>> markers inside optimizedText.'
+  );
 
   return [
     { role: 'system', content: OPTIMIZATION_SYSTEM_PROMPT },
-    { role: 'user', content: user },
+    { role: 'user', content: chunks.join('\n') },
   ];
+}
+
+/** @param {{ start: number; end: number }[]} regions */
+function applyProtectedMarkers(text, regions) {
+  if (!regions || regions.length === 0) return text;
+
+  const sorted = [...regions].sort((a, b) => b.start - a.start);
+  let result = text;
+  for (const { start, end } of sorted) {
+    if (!(end > start)) continue;
+    const before = result.slice(0, start);
+    const protectedSlice = result.slice(start, end);
+    const after = result.slice(end);
+    result = `${before}<<PROTECTED>>${protectedSlice}<</PROTECTED>>${after}`;
+  }
+  return result;
 }

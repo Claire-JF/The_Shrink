@@ -65,7 +65,6 @@ function cleanProtectedRegions(optimizedText, regions) {
           ? p.original_text
           : '';
 
-    /** Repair coordinates using originalText when needed */
     if (
       originalText &&
       (!Number.isFinite(start) ||
@@ -94,7 +93,11 @@ function cleanProtectedRegions(optimizedText, regions) {
   return out;
 }
 
-export function validateOptimized(obj) {
+/**
+ * @param {object} obj parsed model JSON
+ * @param {string[]} protectedTexts verbatim substrings that must appear when safetyOverride is false
+ */
+export function validateOptimized(obj, protectedTexts = []) {
   const errors = [];
 
   if (!obj || typeof obj !== 'object') {
@@ -113,6 +116,8 @@ export function validateOptimized(obj) {
     return { valid: false, data: null, errors };
   }
 
+  const optimizedText = obj.optimizedText;
+
   const safetyOverride =
     typeof obj.safetyOverride === 'boolean'
       ? obj.safetyOverride
@@ -120,7 +125,18 @@ export function validateOptimized(obj) {
         ? obj.safety_override
         : false;
 
-  const optimizedText = obj.optimizedText;
+  if (!safetyOverride && Array.isArray(protectedTexts) && protectedTexts.length) {
+    for (const snippet of protectedTexts) {
+      if (!snippet) continue;
+      if (!optimizedText.includes(snippet)) {
+        errors.push(`Protected region missing from output: "${String(snippet).slice(0, 60)}..."`);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, data: null, errors };
+  }
 
   /** @type {unknown[]} */
   const pr = Array.isArray(obj.protectedRegions)
