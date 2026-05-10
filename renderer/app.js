@@ -1,1003 +1,487 @@
-const USE_MOCK = typeof window.shrink === "undefined";
+/* global shrink */
 
-const SCORE_KEYS = [
-  { key: "clarity", label: "Clarity" },
-  { key: "safety", label: "Safety" },
-  { key: "emotionalBalance", label: "Tone" },
-];
+/** Source text for the captured prompt (single source for offsets). */
+let sourcePlain = '';
+/** Half-open intervals merged & clamped — user-defined protected spans. */
+let userProtectedRegions = [];
 
-const DIMENSION_EXPLANATIONS = {
-  clarity: "How specific and actionable your prompt is. Vague prompts lead to generic responses — add file names, function names, or a clear goal.",
-  safety: "Whether your prompt avoids harmful or destructive instructions. High safety means the AI can execute it without risk of unintended damage.",
-  emotionalBalance: "Emotional tone of your prompt. Charged or manipulative language reduces response quality and may cause the AI to respond defensively.",
-};
-
-const INPUT_EVALUATIONS = {
-  clarity:
-    "Your input does not fully match Clarity because it says the login is broken, but does not name the file, function, error, or expected behavior. The AI has to guess what to inspect.",
-  safety:
-    "Your input matches Safety well. It asks for debugging help and does not request destructive, harmful, or risky behavior.",
-  emotionalBalance:
-    "Your input matches Tone well. It is direct and neutral, without pressure, flattery, or emotionally loaded language that could bias the AI response.",
-};
-
-// Short one-line verdict shown in the petal tooltip when hovering a dimension
-const PETAL_COMMENTS = {
-  clarity: {
-    danger:  "Too vague — AI has no clear target to act on",
-    warning: "A bit more detail would sharpen this",
-    success: "Clear and actionable ✓",
-  },
-  safety: {
-    danger:  "Contains potentially risky instructions",
-    warning: "Some parts need careful handling",
-    success: "Safe, no risk detected ✓",
-  },
-  emotionalBalance: {
-    danger:  "Tone is too charged — may skew the response",
-    warning: "Slightly emotional — try a calmer phrasing",
-    success: "Neutral and well-balanced ✓",
-  },
-};
-
-// The clipboard prompt that was scored (shown in issues phase for protection)
-const MOCK_ORIGINAL_PROMPT = "our login is broken can you help me look at it";
-
-const MOCK_SCORE = {
-  clarity: 1.3,
-  safety: 5.0,
-  emotionalBalance: 5.0,
-  total: 3.77,
-  summary: "Prompt is vague and lacks specific details or context",
-};
-
-const MOCK_OPTIMIZED = {
-  optimizedText:
-    "Please review the authentication flow in /src/auth/session.js and refactor signIn() to use async/await. Do not change the public API. Done when all existing tests pass.",
-  changes: [
-    "Replaced vague 'look at it' with specific function and file",
-    "Added clear success condition",
-    "Removed ambiguous scope",
-  ],
-};
-
-if (USE_MOCK) {
-  const optimizeHandlers = [];
-  window.shrink = {
-    onScoreReady: (cb) => setTimeout(() => cb(MOCK_SCORE), 1200),
-    onOptimizeReady: (cb) => optimizeHandlers.push(cb),
-    generate: () => setTimeout(() => optimizeHandlers.forEach((h) => h(MOCK_OPTIMIZED)), 1500),
-    copy: (text) => navigator.clipboard?.writeText(text),
-    expand: () => {},
-    collapse: () => {},
-    quit: () => {},
-  };
+function $(id) {
+  return document.getElementById(id);
 }
 
-const state = {
-  mode: "cat",
-  phase: "issues",
-  score: null,
-  optimized: null,
-  copyTimer: null,
-  bubbleTimer: null,
-  draftScoreTimer: null,
-  bubbleVisible: false,
-  bubbleSuppressed: false,
-  selectedScorer: "Qwen2.5-7B",
-  pointer: {
-    x: null,
-    y: null,
-  },
-  drag: {
-    active: false,
-    pointerId: null,
-    offsetX: 0,
-    offsetY: 0,
-    startX: 0,
-    startY: 0,
-    moved: false,
-    suppressClick: false,
-  },
-};
-
-const elements = {
-  body: document.body,
-  shell: document.getElementById("shell"),
-  catFace: document.getElementById("catFace"),
-  catWrap: document.querySelector(".pet__cat-wrap"),
-  scoreHover: document.getElementById("scoreHover"),
-  petalTip: document.getElementById("petalTip"),
-  petBubble: document.getElementById("petBubble"),
-  collapseButton: document.getElementById("collapseButton"),
-  quitButton: document.getElementById("quitButton"),
-  panel: document.getElementById("panel"),
-  panelScoreline: document.getElementById("panelScoreline"),
-  panelTitle: document.getElementById("panelTitle"),
-  panelSubtitle: document.getElementById("panelSubtitle"),
-  scorerSelect: document.getElementById("scorerSelect"),
-  originalSection: document.getElementById("originalSection"),
-  originalField: document.getElementById("originalField"),
-  summaryBlock: document.getElementById("summaryBlock"),
-  issuesGroups: document.getElementById("issuesGroups"),
-  editorSection: document.getElementById("editorSection"),
-  metricStrip: document.getElementById("metricStrip"),
-  metricDetail: document.getElementById("metricDetail"),
-  optimizedEditor: document.getElementById("optimizedEditor"),
-  actionButton: document.getElementById("actionButton"),
-  copyButton: document.getElementById("copyButton"),
-  regenerateButton: document.getElementById("regenerateButton"),
-};
-
-function formatScore(value) {
-  return Number(value || 0).toFixed(1);
+function setScore(score) {
+  const t = score && score.total != null ? Number(score.total).toFixed(2) : '—';
+  $('scoreLabel').textContent = `Score ${t} / 5.0`;
 }
 
-function formatTotal(value) {
-  return Number(value || 0).toFixed(2).replace(/(\.\d)0$/, "$1");
+function setBusyOverlay(visible, message) {
+  const overlay = $('loadingOverlay');
+  const msgEl = $('loadingMessage');
+  if (!overlay || !msgEl) return;
+  overlay.classList.toggle('hidden', !visible);
+  overlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  msgEl.textContent = message || 'Please wait…';
 }
 
-function resetCopyTimer() {
-  if (state.copyTimer) {
-    window.clearTimeout(state.copyTimer);
-    state.copyTimer = null;
+function normalizeRegions(raw, length) {
+  if (!length) return [];
+  const rows = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!r || typeof r !== 'object') continue;
+    const s = Number(r.start);
+    const e = Number(r.end);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    const start = Math.max(0, Math.min(length, Math.floor(s)));
+    const end = Math.max(0, Math.min(length, Math.ceil(e)));
+    if (end > start) rows.push({ start, end });
   }
-  elements.copyButton.classList.remove("is-active");
-  elements.copyButton.textContent = "⧉";
-  elements.copyButton.title = "Copy";
-  elements.copyButton.setAttribute("aria-label", "Copy optimized prompt");
-}
-
-function resetBubbleTimer() {
-  if (state.bubbleTimer) {
-    window.clearTimeout(state.bubbleTimer);
-    state.bubbleTimer = null;
+  rows.sort((a, b) => a.start - b.start);
+  /** @type {{ start: number; end: number }[]} */
+  const merged = [];
+  for (const r of rows) {
+    const prev = merged[merged.length - 1];
+    if (!prev || r.start > prev.end) merged.push({ ...r });
+    else prev.end = Math.max(prev.end, r.end);
   }
+  return merged;
 }
 
-function resetDraftScoreTimer() {
-  if (state.draftScoreTimer) {
-    window.clearTimeout(state.draftScoreTimer);
-    state.draftScoreTimer = null;
-  }
+function mergeUserInterval(start, end) {
+  sourcePlain = sourcePlain || '';
+  const len = sourcePlain.length;
+  if (!(end > start) || len < 1) return;
+  const next = [...userProtectedRegions, { start, end }];
+  userProtectedRegions = normalizeRegions(next, len);
+  renderOriginalHost();
 }
 
-function setBubbleVisible(visible) {
-  state.bubbleVisible = visible;
-  const shouldShow = visible && !state.bubbleSuppressed;
-  elements.petBubble.classList.toggle("is-visible", shouldShow);
-  elements.petBubble.setAttribute("aria-hidden", String(!shouldShow));
+function removeProtBySpan(span) {
+  const s = Number(span.dataset.protStart);
+  const e = Number(span.dataset.protEnd);
+  userProtectedRegions = userProtectedRegions.filter((r) => !(r.start === s && r.end === e));
+  renderOriginalHost();
 }
 
-function showBubbleBriefly() {
-  setBubbleVisible(true);
-  resetBubbleTimer();
-
-  if (state.mode === "cat") {
-    state.bubbleTimer = window.setTimeout(() => {
-      setBubbleVisible(false);
-    }, 3600);
-  }
+function appendTextFragment(el, str) {
+  el.appendChild(document.createTextNode(str));
 }
 
-function setMode(mode) {
-  state.mode = mode;
-  elements.body.classList.toggle("mode-cat", mode === "cat");
-  elements.body.classList.toggle("mode-panel", mode === "panel");
-  elements.panel.setAttribute("aria-hidden", String(mode !== "panel"));
+/** @param {HTMLElement} host */
+function getSelectionOffsetsIn(host) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed || !host) return null;
 
-  if (mode === "panel") {
-    setBubbleVisible(false);
-    resetBubbleTimer();
-  }
-}
+  const range = sel.getRangeAt(0);
+  if (!host.contains(range.commonAncestorContainer)) return null;
 
-function setPhase(phase) {
-  state.phase = phase;
-  elements.body.classList.remove("phase-issues", "phase-loading", "phase-optimized");
-  elements.body.classList.add(`phase-${phase}`);
-}
+  const pre = document.createRange();
+  pre.selectNodeContents(host);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = pre.toString().length;
+  const selected = range.toString();
+  const end = start + selected.length;
 
-function getMood(score) {
-  if (state.phase === "loading") return "Thinking";
-  if (state.phase === "optimized") return "Relieved";
-  if (score == null) return "Idle";
-  if (score < 2.0) return "Anxious";
-  if (score >= 3.5) return "Focused";
-  return "Confused";
-}
-
-const CAT_IMAGES = {
-  happy:   "./cats/cat_happy.png",
-  confused: "./cats/cat_confused.png",
-  shock:   "./cats/cat_shock.png",
-  pending: "./cats/cat_pending.png",
-};
-
-const CAT_SIZE = 112;
-const CAT_CENTER = CAT_SIZE / 2;
-
-function setCatImage(key) {
-  elements.catFace.src = CAT_IMAGES[key] || CAT_IMAGES.happy;
-}
-
-function updatePet(scoreData) {
-  const total = scoreData && typeof scoreData.total === "number" ? scoreData.total : null;
-  const clarity = scoreData && typeof scoreData.clarity === "number" ? scoreData.clarity : null;
-  const mood = getMood(total);
-
-  elements.catFace.classList.remove("cat--bad", "cat--warn", "cat--good", "cat--loading", "cat--idle");
-
-  if (total === null) {
-    elements.catFace.classList.add("cat--idle");
-    setCatImage("happy");
-    elements.petBubble.textContent = "";
-    return;
+  if (!(end > start)) return null;
+  if (start >= 0 && end <= sourcePlain.length && sourcePlain.slice(start, end) === selected) {
+    return { start, end };
   }
 
-  if (state.phase === "loading") {
-    elements.catFace.classList.add("cat--loading");
-    setCatImage("confused");
-  } else if (total < 2.0) {
-    elements.catFace.classList.add("cat--bad");
-    setCatImage("shock");
-  } else if (clarity !== null && clarity < 2.0) {
-    elements.catFace.classList.add("cat--warn");
-    setCatImage("pending");
-  } else if (total >= 3.5) {
-    elements.catFace.classList.add("cat--good");
-    setCatImage("happy");
-  } else {
-    elements.catFace.classList.add("cat--warn");
-    setCatImage("pending");
-  }
+  /** Rare layout drift — substring search fallback */
+  const idx = sourcePlain.indexOf(selected);
+  if (idx !== -1) return { start: idx, end: idx + selected.length };
 
-  elements.petBubble.innerHTML =
-    `<span class="pet__bubble-mood">${mood}</span>` +
-    (state.mode === "panel" ? "" : `<span class="pet__bubble-score">${formatTotal(total)} / 5.0</span>`);
-}
-
-function setActionButton({ label, variant, disabled }) {
-  elements.actionButton.textContent = label;
-  elements.actionButton.disabled = Boolean(disabled);
-  elements.actionButton.className = `action-button action-button--${variant}`;
-}
-
-function setCopyButtonVisible(visible) {
-  elements.copyButton.classList.toggle("is-hidden", !visible);
-}
-
-function setRegenerateButtonVisible(visible) {
-  elements.regenerateButton.classList.toggle("is-hidden", !visible);
-}
-
-function setActionButtonVisible(visible) {
-  elements.actionButton.classList.toggle("is-hidden", !visible);
-}
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function setShellPosition(left, top) {
-  const margin = 8;
-  const shellRect = elements.shell.getBoundingClientRect();
-  const catSize = elements.catWrap.getBoundingClientRect().width || CAT_SIZE;
-  const shellWidth = shellRect.width || 360;
-  const minLeft = margin;
-  const maxLeft = Math.max(minLeft, window.innerWidth - shellWidth - margin);
-  const maxTop = window.innerHeight - catSize - margin;
-
-  elements.shell.style.left = `${clamp(left, minLeft, maxLeft)}px`;
-  elements.shell.style.top = `${clamp(top, margin, maxTop)}px`;
-  elements.shell.style.right = "auto";
-}
-
-function buildIssueSections(scoreData) {
-  return SCORE_KEYS.map(({ key, label }) => ({
-    key,
-    label,
-    score: Number(scoreData?.[key] || 0),
-  }));
-}
-
-function getSeverity(score) {
-  if (score < 2.0) return "danger";
-  if (score <= 3.4) return "warning";
-  return "success";
-}
-
-// ── Radial petal slices — fan out from cat centre toward lower-left ──────────
-// Angle convention: 0°=right, 90°=down, 180°=left (SVG/screen, clockwise).
-// Cat sits at top-right → three arcs sweep: down (90°), lower-left (135°), left (180°).
-//
-// Each slice is drawn as a THICK STROKED ARC (fill:none) so stroke-linecap:"round"
-// gives natural rounded ends — no fill polygon needed.
-// Text + score sit at the geometric centre of the arc (R_MID, centre angle).
-
-function fp(n) { return n.toFixed(1); }
-
-function buildPetalsSVG(scoreData) {
-  const sliceDefs = [
-    { key: "clarity",          label: "Clarity", center:  90 },
-    { key: "safety",           label: "Safety",  center: 135 },
-    { key: "emotionalBalance", label: "Tone",    center: 180 },
-  ];
-
-  // Arc geometry — fan starts just outside the enlarged cat.
-  const HALF  = 20;   // half-angle per slice → 40° each, ~10° natural gaps
-  const TRIM  = 3;    // degrees trimmed each end inside the clip sector
-  const R_MID = 90;   // midpoint radius of the stroke band
-  const SW    = 46;   // stroke-width  (inner ≈ 67, outer ≈ 113)
-  const R_IN  = R_MID - SW / 2;
-  const R_OUT = R_MID + SW / 2;
-  const FONT  = "Inter,system-ui,sans-serif";
-
-  // <clipPath> per slice — confines each thick stroked arc to its own angular sector
-  // so rounded ends from stroke-linecap can't bleed into adjacent slices.
-  const clipDefs = sliceDefs.map(({ key, center }) => {
-    const s  = (center - HALF) * Math.PI / 180;
-    const e  = (center + HALF) * Math.PI / 180;
-    const R  = R_OUT + SW;               // clip fan radius — safely beyond stroke outer edge
-    const px1 = R * Math.cos(s), py1 = R * Math.sin(s);
-    const px2 = R * Math.cos(e), py2 = R * Math.sin(e);
-    // Fan-shaped clip: origin → start edge → arc → end edge → back
-    return (
-      `<clipPath id="pc_${key}">` +
-      `<path d="M0,0 L${fp(px1)},${fp(py1)} A${fp(R)},${fp(R)} 0 0,1 ${fp(px2)},${fp(py2)} Z"/>` +
-      `</clipPath>`
-    );
-  }).join("");
-
-  const parts = sliceDefs.map(({ key, label, center }) => {
-    const score = Math.max(0, Math.min(5, Number(scoreData[key] || 0)));
-    const sev   = getSeverity(score);
-
-    // Trim a few degrees each end for a visible gap between slices
-    const sRad = (center - HALF + TRIM) * Math.PI / 180;
-    const eRad = (center + HALF - TRIM) * Math.PI / 180;
-    const mRad = center * Math.PI / 180;
-
-    const x1 = R_MID * Math.cos(sRad), y1 = R_MID * Math.sin(sRad);
-    const x2 = R_MID * Math.cos(eRad), y2 = R_MID * Math.sin(eRad);
-    const arc  = `M${fp(x1)},${fp(y1)} A${R_MID},${R_MID} 0 0,1 ${fp(x2)},${fp(y2)}`;
-    const clip = `clip-path="url(#pc_${key})"`;
-
-    const rgb       = sev === "danger"  ? "255,139,160"
-                    : sev === "warning" ? "255,211,107"
-                    : "98,213,180";
-    const darkBase  = "rgba(8,14,36,0.34)";   // subtle dark fill — lower opacity
-    const textDim   = "rgba(211,223,252,0.82)";
-    const textScore = `rgba(${rgb},1)`;
-
-    const tx = R_MID * Math.cos(mRad);
-    const ty = R_MID * Math.sin(mRad);
-    // Always "middle" — text centered at the geometric midpoint of each arc
-    const anchor = "middle";
-
-    return (
-      // Dark glass base only, clipped to this sector — no rim line
-      `<path d="${arc}" fill="none" stroke="${darkBase}" stroke-width="${SW}" stroke-linecap="round" ${clip}/>` +
-      // Label + score centered at arc midpoint
-      `<text text-anchor="${anchor}" font-family="${FONT}">` +
-        `<tspan x="${fp(tx)}" y="${fp(ty)}" dy="-6" fill="${textDim}" font-size="8" letter-spacing="0.05em">${label}</tspan>` +
-        `<tspan x="${fp(tx)}" y="${fp(ty)}" dy="8" fill="${textScore}" font-size="12" font-weight="700">${score.toFixed(1)}</tspan>` +
-      `</text>`
-    );
-  });
-
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" ` +
-    `style="overflow:visible;position:absolute;left:0;top:0" width="0" height="0" aria-hidden="true">` +
-    `<defs>${clipDefs}</defs>` +
-    parts.join("") +
-    `</svg>`
-  );
-}
-
-function renderScoreHover(scoreData) {
-  elements.scoreHover.innerHTML = buildPetalsSVG(scoreData);
-}
-
-// ── Score hover show / hide ───────────────────────────────────────────────────
-
-const HOVER_RADIUS = 132;  // px from cat centre — covers the petal SVG overflow zone
-
-function showIdleShock() {
-  if (elements.catFace.dataset.hoverMood === "shock") return;
-  elements.catFace.dataset.hoverMood = "shock";
-  elements.catFace.src = CAT_IMAGES.shock;
-}
-
-function hideIdleShock() {
-  if (elements.catFace.dataset.hoverMood !== "shock") return;
-  delete elements.catFace.dataset.hoverMood;
-  updatePet(state.score);
-}
-
-function getPointerDeltaFromCat() {
-  if (state.pointer.x === null || state.pointer.y === null) return null;
-  const rect = elements.catWrap.getBoundingClientRect();
-  return {
-    dx: state.pointer.x - (rect.left + rect.width / 2),
-    dy: state.pointer.y - (rect.top + rect.height / 2),
-  };
-}
-
-function showScoreHover() {
-  if (!state.score || state.mode !== "cat" || state.drag.active) return;
-  // Guard: skip if already visible (pointermove fires continuously)
-  if (elements.scoreHover.classList.contains("is-visible")) return;
-
-  state.bubbleSuppressed = true;
-  elements.petBubble.classList.remove("is-visible");
-  elements.petBubble.setAttribute("aria-hidden", "true");
-  renderScoreHover(state.score);
-  elements.scoreHover.classList.add("is-visible");
-  elements.scoreHover.setAttribute("aria-hidden", "false");
-}
-
-function hideScoreHover() {
-  if (!elements.scoreHover.classList.contains("is-visible")) return;
-  elements.scoreHover.classList.remove("is-visible");
-  elements.scoreHover.setAttribute("aria-hidden", "true");
-  state.bubbleSuppressed = false;
-  setBubbleVisible(state.bubbleVisible);
-  hidePetalTip();
-}
-
-// ── Petal tooltip — one-line verdict per dimension ────────────────────────────
-// Cat center in pet__cat-wrap coords follows CAT_CENTER.
-// Tooltip is positioned at TIP_R from that center in the petal's direction.
-
-const PETAL_TIP_DEFS = [
-  { key: "clarity",          center: 90  },
-  { key: "safety",           center: 135 },
-  { key: "emotionalBalance", center: 180 },
-];
-const PETAL_HALF   = 20;    // ± degrees per slice (must match buildPetalsSVG)
-const PETAL_R_IN   = 67;    // px — inner edge of stroke band
-const PETAL_R_OUT  = 113;   // px — outer edge of stroke band
-const TIP_R        = 128;   // px — tooltip anchor radius from cat center
-
-function getHoveredPetal(dx, dy) {
-  const dist = Math.hypot(dx, dy);
-  if (dist < PETAL_R_IN || dist > PETAL_R_OUT) return null;
-  let angle = Math.atan2(dy, dx) * 180 / Math.PI;
-  if (angle < 0) angle += 360;
-  for (const p of PETAL_TIP_DEFS) {
-    if (Math.abs(angle - p.center) <= PETAL_HALF) return p.key;
-  }
   return null;
 }
 
-function showPetalTip(key) {
-  if (!elements.petalTip) return;
-  const score  = state.score[key];
-  const sev    = getSeverity(score);
-  const text   = PETAL_COMMENTS[key]?.[sev] ?? "";
-  const petal  = PETAL_TIP_DEFS.find(p => p.key === key);
-  const mRad   = petal.center * Math.PI / 180;
-
-  // Use viewport coords — tooltip is position:fixed so it escapes all parent clipping
-  const rect = elements.catWrap.getBoundingClientRect();
-  const cx   = rect.left + rect.width  / 2;
-  const cy   = rect.top  + rect.height / 2;
-  const tipX = cx + TIP_R * Math.cos(mRad);
-  const tipY = cy + TIP_R * Math.sin(mRad);
-
-  // Cat is always top-right → right-align all tips so text extends leftward,
-  // never overflows the right screen edge.
-  const isDown = petal.center <= 100;
-  const xform  = isDown
-    ? "translate(-100%, 4px)"               // Clarity (down): right edge at anchor
-    : "translate(calc(-100% - 4px), -50%)"; // Safety/Tone (left): right edge at anchor
-
-  const tip = elements.petalTip;
-  tip.textContent     = text;
-  tip.style.left      = `${tipX}px`;
-  tip.style.top       = `${tipY}px`;
-  tip.style.transform = xform;
-  tip.classList.add("is-visible");
-  tip.setAttribute("aria-hidden", "false");
-}
-
-function hidePetalTip() {
-  if (!elements.petalTip) return;
-  elements.petalTip.classList.remove("is-visible");
-  elements.petalTip.setAttribute("aria-hidden", "true");
-}
-
-// Click anywhere in the petal band opens the full panel.
-// The SVG has pointer-events:none so we detect via distance, same as pointermove.
-function handleDocumentClick(event) {
-  if (event.target === elements.petalTip) return; // handled by its own listener
-  if (state.mode !== "cat" || !state.score || state.drag?.suppressClick) return;
-  const rect = elements.catWrap.getBoundingClientRect();
-  const dx   = event.clientX - (rect.left + rect.width  / 2);
-  const dy   = event.clientY - (rect.top  + rect.height / 2);
-  const dist = Math.hypot(dx, dy);
-  if (dist >= PETAL_R_IN && dist <= PETAL_R_OUT) {
-    hidePetalTip();
-    openPanel();
-  }
-}
-
-// pointermove on document — covers petal overflow area (mouseenter/leave on the
-// catWrap only covers the cat image, so document-level pointermove catches SVG overflow.
-function handlePointerMove(event) {
-  // When cursor is on the tip pill itself, don't dismiss — it's clickable
-  if (event.target === elements.petalTip) return;
-
-  state.pointer.x = event.clientX;
-  state.pointer.y = event.clientY;
-
-  if (state.mode !== "cat" || state.drag.active) {
-    hideScoreHover();
-    hidePetalTip();
-    hideIdleShock();
+/** Render original column with clickable protected spans */
+function renderOriginalHost() {
+  const host = $('originalHost');
+  if (!host) return;
+  host.innerHTML = '';
+  sourcePlain = sourcePlain ?? '';
+  if (!sourcePlain) {
+    appendTextFragment(host, '—');
     return;
   }
+  const regs = normalizeRegions(userProtectedRegions, sourcePlain.length);
+  userProtectedRegions = regs;
+  let cursor = 0;
+  for (const r of regs) {
+    appendTextFragment(host, sourcePlain.slice(cursor, r.start));
+    const span = document.createElement('span');
+    span.className = 'orig-prot';
+    span.dataset.protStart = String(r.start);
+    span.dataset.protEnd = String(r.end);
+    span.textContent = sourcePlain.slice(r.start, r.end);
+    span.title = '单击取消保留';
+    host.appendChild(span);
+    cursor = r.end;
+  }
+  appendTextFragment(host, sourcePlain.slice(cursor));
+}
 
-  const rect = elements.catWrap.getBoundingClientRect();
-  const dx   = event.clientX - (rect.left + rect.width  / 2);
-  const dy   = event.clientY - (rect.top  + rect.height / 2);
+/**
+ * Sorted non-overlapping intervals for highlighting optimized output (model coordinates).
+ * @param {{ start: number; end: number }[]} regions
+ */
+function sortCleanRegions(length, regions) {
+  /** @type {{ start: number; end: number }[]} */
+  const rows = [];
+  for (const r of Array.isArray(regions) ? regions : []) {
+    if (!r || typeof r !== 'object') continue;
+    let s = Math.max(0, Math.floor(Number(r.start)));
+    let e = Math.max(0, Math.ceil(Number(r.end)));
+    if (!(e > s)) continue;
+    s = Math.min(length, Math.max(0, s));
+    e = Math.min(length, Math.max(0, e));
+    if (e > s) rows.push({ start: s, end: e });
+  }
+  rows.sort((a, b) => a.start - b.start);
+  /** Merge overlaps for clearer paint */
+  /** @type {{ start: number; end: number }[]} */
+  const merged = [];
+  for (const r of rows) {
+    const prev = merged[merged.length - 1];
+    if (!prev || r.start > prev.end) merged.push({ ...r });
+    else prev.end = Math.max(prev.end, r.end);
+  }
+  return merged;
+}
 
-  if (Math.hypot(dx, dy) <= HOVER_RADIUS) {
-    if (state.score) {
-      hideIdleShock();
-      showScoreHover();
-      const hovered = getHoveredPetal(dx, dy);
-      // Only update when on a petal; keep tip alive in the gap zone so cursor can reach it
-      if (hovered) showPetalTip(hovered);
-    } else {
-      hideScoreHover();
-      hidePetalTip();
-      showIdleShock();
-    }
-  } else {
-    hideScoreHover();
-    hidePetalTip();
-    hideIdleShock();
+function renderOptimizedHost(fullText, protectedRegionsMeta) {
+  const el = $('optimized');
+  if (!el) return;
+  el.innerHTML = '';
+
+  const L = typeof fullText === 'string' ? fullText.length : 0;
+  const regs = sortCleanRegions(L, protectedRegionsMeta);
+  let cursor = 0;
+  for (const r of regs) {
+    appendTextFragment(el, fullText.slice(cursor, r.start));
+    const span = document.createElement('span');
+    span.className = 'opt-protected';
+    span.textContent = fullText.slice(r.start, r.end);
+    el.appendChild(span);
+    cursor = r.end;
+  }
+  appendTextFragment(el, fullText.slice(cursor));
+}
+
+const DIM_KEYS = ['clarity', 'emotionalBalance', 'safety'];
+const DIM_LABEL = {
+  clarity: 'Clarity',
+  emotionalBalance: 'Emotional balance',
+  safety: 'Safety',
+};
+
+function renderScoreDetails(score) {
+  const ul = $('flags');
+  ul.innerHTML = '';
+
+  if (score && typeof score.summary === 'string' && score.summary.trim()) {
+    const li = document.createElement('li');
+    li.textContent = score.summary.trim();
+    ul.appendChild(li);
+  }
+
+  DIM_KEYS.forEach((k) => {
+    if (score == null || score[k] == null) return;
+    const li = document.createElement('li');
+    const v = Number(score[k]).toFixed(1);
+    li.textContent = `${DIM_LABEL[k] || k}: ${v} / 5.0`;
+    li.style.opacity = '0.9';
+    ul.appendChild(li);
+  });
+
+  if (!ul.children.length) {
+    const li = document.createElement('li');
+    li.textContent = '—';
+    ul.appendChild(li);
   }
 }
 
-// ── Metric strip (panel) ──────────────────────────────────────────────────────
-
-function renderIssues(scoreData) {
-  elements.issuesGroups.replaceChildren();
-  elements.summaryBlock.classList.add("is-hidden");
-  elements.summaryBlock.textContent = "";
-  renderCompactMetrics(scoreData, elements.issuesGroups);
+function renderChanges(opt) {
+  const list = $('changes');
+  list.innerHTML = '';
+  const arr = opt && Array.isArray(opt.changes) ? opt.changes : [];
+  if (!arr.length) {
+    list.classList.add('hidden');
+    return;
+  }
+  list.classList.remove('hidden');
+  arr.forEach((c) => {
+    const li = document.createElement('li');
+    li.textContent = String(c);
+    list.appendChild(li);
+  });
 }
 
-function renderCompactMetrics(scoreData, target = elements.metricStrip) {
-  target.replaceChildren();
-  elements.metricDetail.classList.add("is-hidden");
-  elements.metricDetail.textContent = "";
+function pickOptimizedText(opt) {
+  if (!opt || typeof opt !== 'object') return '';
+  if (typeof opt.optimizedText === 'string') return opt.optimizedText;
+  if (typeof opt.optimized_text === 'string') return opt.optimized_text;
+  return '';
+}
 
-  buildIssueSections(scoreData).forEach((section) => {
-    const item = document.createElement("div");
-    item.className = `metric-strip__item metric-strip__item--${getSeverity(section.score)}`;
-    item.dataset.key = section.key;
-    item.setAttribute("role", "button");
-    item.setAttribute("tabindex", "0");
-    item.setAttribute("aria-expanded", "false");
-    item.innerHTML =
-      `<div class="metric-strip__copy">` +
-      `<div class="metric-strip__label">` +
-      `<span>${section.label}</span>` +
-      `<span class="metric-strip__help" data-tip="${DIMENSION_EXPLANATIONS[section.key]}" aria-label="${section.label} scoring help">?</span>` +
-      `</div>` +
-      `<div class="metric-strip__value">${formatScore(section.score)}</div>` +
-      `</div>`;
-    target.appendChild(item);
+function applySafetyBanner(visible, message) {
+  const b = $('safetyBanner');
+  if (!b) return;
+  b.classList.toggle('hidden', !visible);
+  if (visible) {
+    b.textContent =
+      message || '因安全评分低于 2.0，本轮已忽略您在原文中标记的保护区域，并对全文作了改写。';
+  } else {
+    b.textContent = '';
+  }
+}
+
+function showLoadingState() {
+  sourcePlain = '';
+  userProtectedRegions = [];
+  applySafetyBanner(false, '');
+  $('rightTitle').textContent = '';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('changes').classList.add('hidden');
+  $('flags').classList.add('hidden');
+  const host = $('originalHost');
+  if (host) {
+    host.innerHTML = '';
+    appendTextFragment(host, '…');
+  }
+  setScore(null);
+  $('btnGenerate').disabled = true;
+  setBusyOverlay(true, 'Reading selection & scoring…');
+}
+
+/** Pop-up shown immediately on hotkey; host app still has focus while we read the selection. */
+function showCaptureAwaitingSelection() {
+  applySafetyBanner(false, '');
+  $('rightTitle').textContent = 'Score';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('changes').classList.add('hidden');
+  $('flags').classList.add('hidden');
+  sourcePlain = '';
+  userProtectedRegions = [];
+  const host = $('originalHost');
+  if (host) {
+    host.innerHTML = '';
+    appendTextFragment(host, '…');
+  }
+  setScore(null);
+  $('btnGenerate').disabled = true;
+  setBusyOverlay(true, 'Reading selection…');
+}
+
+/** After selection text is known, while the main process is still awaiting `score()`. */
+function showCaptureScoringPending(payload) {
+  applySafetyBanner(false, '');
+  $('rightTitle').textContent = 'Score';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('changes').classList.add('hidden');
+  $('flags').classList.add('hidden');
+
+  let text = typeof payload?.capturedText === 'string' ? payload.capturedText : '';
+  if (payload.error) {
+    text = `(Error) ${payload.error}${text ? `\n${text}` : ''}`.trim();
+  }
+
+  sourcePlain = text || '';
+  userProtectedRegions = [];
+  $('originalHost').focus({ preventScroll: true });
+  renderOriginalHost();
+
+  setScore(null);
+  $('btnGenerate').disabled = true;
+  setBusyOverlay(true, 'Scoring…');
+}
+
+function showState1(payload) {
+  setBusyOverlay(false);
+  applySafetyBanner(false, '');
+  $('rightTitle').textContent = 'Score';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('flags').classList.remove('hidden');
+  $('changes').classList.add('hidden');
+
+  let text = typeof payload?.capturedText === 'string' ? payload.capturedText : '';
+  if (payload.error) {
+    text = `(Error) ${payload.error}${text ? `\n${text}` : ''}`.trim();
+  }
+
+  sourcePlain = text || '';
+  userProtectedRegions = [];
+  $('originalHost').focus({ preventScroll: true });
+  renderOriginalHost();
+
+  setScore(payload.score);
+  renderScoreDetails(payload.score);
+  $('btnGenerate').disabled = false;
+}
+
+function showState2(opt) {
+  setBusyOverlay(false);
+  $('rightTitle').textContent = 'Optimized';
+  $('flags').classList.add('hidden');
+  $('optimized').classList.remove('hidden');
+  $('btnCopy').classList.remove('hidden');
+  $('btnReplace').classList.remove('hidden');
+
+  applySafetyBanner(!!opt.safetyOverride);
+
+  const full = pickOptimizedText(opt);
+  const pr = opt && Array.isArray(opt.protectedRegions) ? opt.protectedRegions : [];
+  const coords = pr.map((p) =>
+    p && typeof p === 'object'
+      ? { start: Number(p.start), end: Number(p.end) }
+      : { start: 0, end: 0 },
+  );
+
+  if (full && opt?.safetyOverride) {
+    $('optimized').innerHTML = '';
+    $('optimized').textContent = full;
+  } else if (full) {
+    renderOptimizedHost(full, coords);
+  } else {
+    $('optimized').innerHTML = '';
+  }
+
+  renderChanges(opt);
+  $('btnGenerate').disabled = true;
+}
+
+async function refreshConfigBanner() {
+  const cfg = await shrink.getConfig();
+  $('demoBadge').classList.toggle('hidden', !cfg.demoMode);
+  const badge = $('llmBadge');
+  if (badge) {
+    badge.classList.toggle('llm-live', !!cfg.llmConfigured);
+    badge.classList.toggle('llm-mock', !cfg.llmConfigured);
+    badge.textContent = cfg.llmConfigured ? 'CLōD' : 'MOCK LLM';
+  }
+}
+
+function wireProtectedSelectionUI() {
+  const host = $('originalHost');
+  if (!host) return;
+
+  host.addEventListener('click', (e) => {
+    const prot = e.target.closest('.orig-prot');
+    if (prot && host.contains(prot)) {
+      e.preventDefault();
+      removeProtBySpan(prot);
+    }
   });
 
-  target.querySelectorAll(".metric-strip__item").forEach((item) => {
-    const toggleMetric = () => {
-      const key = item.dataset.key;
-      const isOpen = item.getAttribute("aria-expanded") === "true";
-
-      target.querySelectorAll(".metric-strip__item").forEach((el) => {
-        el.setAttribute("aria-expanded", "false");
-        el.classList.remove("is-active");
-      });
-
-      if (isOpen) {
-        elements.metricDetail.classList.add("is-hidden");
-        elements.metricDetail.textContent = "";
-      } else {
-        item.setAttribute("aria-expanded", "true");
-        item.classList.add("is-active");
-        elements.metricDetail.textContent = INPUT_EVALUATIONS[key] || "";
-        elements.metricDetail.classList.remove("is-hidden");
-      }
-    };
-
-    item.addEventListener("click", toggleMetric);
-    item.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        toggleMetric();
-      }
+  host.addEventListener('mouseup', () => {
+    requestAnimationFrame(() => {
+      if (!sourcePlain.trim()) return;
+      const offsets = getSelectionOffsetsIn(host);
+      const sel = window.getSelection();
+      if (offsets) mergeUserInterval(offsets.start, offsets.end);
+      if (sel && typeof sel.removeAllRanges === 'function') sel.removeAllRanges();
     });
   });
 }
 
-// ── Original prompt — highlight protection ────────────────────────────────────
-// Drag-select text in the original field → wraps in .protected-span (blue).
-// Click a protected span → removes protection.
-// Safety < 2.0 → all protections auto-cleared.
+async function bootstrap() {
+  await refreshConfigBanner();
 
-function renderOriginalPrompt(text) {
-  elements.originalField.textContent = text || "";
-  elements.originalSection.classList.remove("is-hidden");
-}
+  shrink.onPresentation((msg) => {
+    if (!msg) return;
+    if (msg.type === 'loading') {
+      showLoadingState();
+    }
+    if (msg.type === 'capture' && msg.payload) {
+      if (msg.payload.loading) {
+        if (msg.payload.phase === 'selection') {
+          showCaptureAwaitingSelection();
+        } else {
+          showCaptureScoringPending(msg.payload);
+        }
+      } else {
+        showState1(msg.payload);
+      }
+    }
+    if (msg.type === 'config' && msg.payload) {
+      $('demoBadge').classList.toggle('hidden', !msg.payload.demoMode);
+    }
+  });
 
-function hideOriginalPrompt() {
-  elements.originalSection.classList.add("is-hidden");
-}
+  wireProtectedSelectionUI();
 
-function unwrapSpan(span) {
-  const parent = span.parentNode;
-  while (span.firstChild) parent.insertBefore(span.firstChild, span);
-  span.remove();
-  parent.normalize();
-}
+  $('btnClose').addEventListener('click', () => shrink.closeWidget());
 
-function clearAllProtections() {
-  elements.originalField.querySelectorAll(".protected-span").forEach(unwrapSpan);
-}
+  $('btnGenerate').addEventListener('click', async () => {
+    $('btnGenerate').disabled = true;
+    setBusyOverlay(true, 'Optimizing prompt…');
+    const regionsPayload = normalizeRegions(userProtectedRegions, sourcePlain.length);
+    userProtectedRegions = regionsPayload;
 
-function handleOriginalMouseUp() {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
-  if (!elements.originalField.contains(range.commonAncestorContainer)) return;
-
-  // Safety guard: if safety < 2, refuse to add protection
-  if (state.score && state.score.safety < 2.0) {
-    sel.removeAllRanges();
-    return;
-  }
-
-  const span = document.createElement("span");
-  span.className = "protected-span";
-  span.title = "Protected — click to remove";
-  try {
-    range.surroundContents(span);
-  } catch {
-    // Selection crosses element boundaries (e.g. existing span edge) — skip
-    sel.removeAllRanges();
-    return;
-  }
-  sel.removeAllRanges();
-}
-
-function handleOriginalClick(event) {
-  const span = event.target.closest(".protected-span");
-  if (!span) return;
-  unwrapSpan(span);
-}
-
-// ── Panel render phases ───────────────────────────────────────────────────────
-
-function renderIssuesPanel(scoreData) {
-  setPhase("issues");
-  state.score = scoreData;
-  state.optimized = null;
-  resetCopyTimer();
-  elements.scorerSelect.value = state.selectedScorer;
-
-  elements.panelScoreline.textContent = `${formatTotal(scoreData.total)} / 5.0`;
-  elements.panelTitle.textContent =
-    scoreData.total < 2.0 ? "Prompt feels shaky" : "Prompt needs some tightening";
-  elements.panelSubtitle.textContent =
-    scoreData.summary || "Current scoring across clarity, safety, and tone.";
-  renderIssues(scoreData);
-  elements.editorSection.classList.add("is-hidden");
-  elements.metricStrip.replaceChildren();
-  setCopyButtonVisible(false);
-  setRegenerateButtonVisible(false);
-  setActionButtonVisible(true);
-  setActionButton({ label: "Optimize my input", variant: "primary", disabled: false });
-  updatePet(scoreData);
-
-  // Show original prompt (mock or real). Auto-clear protections if safety < 2.
-  const promptText = state.originalPrompt || (USE_MOCK ? MOCK_ORIGINAL_PROMPT : "");
-  renderOriginalPrompt(promptText);
-  if (scoreData.safety < 2.0) clearAllProtections();
-}
-
-function renderLoading() {
-  setPhase("loading");
-  resetCopyTimer();
-  resetDraftScoreTimer();
-
-  elements.panelTitle.textContent = "Thinking through a rewrite";
-  elements.panelSubtitle.textContent = "Optimizing your input…";
-  elements.summaryBlock.classList.add("is-hidden");
-  hideOriginalPrompt();
-  elements.issuesGroups.innerHTML =
-    '<div class="loading-view"><div class="spinner" aria-hidden="true"></div><div class="empty-message">Optimizing…</div></div>';
-  elements.editorSection.classList.add("is-hidden");
-  setCopyButtonVisible(false);
-  setRegenerateButtonVisible(false);
-  setActionButtonVisible(true);
-  setActionButton({ label: "Optimizing…", variant: "primary", disabled: true });
-  updatePet(state.score);
-}
-
-function renderOptimized(optimizeData) {
-  setPhase("optimized");
-  state.optimized = optimizeData;
-  resetCopyTimer();
-  resetDraftScoreTimer();
-
-  elements.panelScoreline.textContent = `${formatTotal(state.score?.total)} / 5.0`;
-  elements.panelTitle.textContent = "Here is a calmer rewrite";
-  elements.panelSubtitle.textContent = "";
-  elements.summaryBlock.classList.add("is-hidden");
-  elements.issuesGroups.replaceChildren();
-  elements.editorSection.classList.remove("is-hidden");
-  elements.optimizedEditor.value = optimizeData.optimizedText || "";
-  renderCompactMetrics(state.score);
-  // Keep original section visible below the optimized editor.
-  // Same DOM element — protected spans persist and remain interactive.
-  elements.originalSection.classList.remove("is-hidden");
-  setCopyButtonVisible(true);
-  setRegenerateButtonVisible(true);
-  setActionButtonVisible(false);
-  updatePet(state.score);
-}
-
-function renderError() {
-  setPhase("issues");
-  elements.panelTitle.textContent = "Analysis unavailable";
-  elements.panelSubtitle.textContent = "The panel is still safe to keep open.";
-  elements.summaryBlock.classList.add("is-hidden");
-  elements.issuesGroups.innerHTML =
-    '<div class="error-view"><div class="empty-message">Analysis unavailable</div></div>';
-  elements.editorSection.classList.add("is-hidden");
-  setCopyButtonVisible(false);
-  setRegenerateButtonVisible(false);
-  setActionButtonVisible(true);
-  setActionButton({ label: "Optimize my input", variant: "primary", disabled: false });
-}
-
-// ── Mode transitions ──────────────────────────────────────────────────────────
-
-function openPanel() {
-  if (!state.score) return;
-  hideScoreHover();
-  setMode("panel");
-  window.shrink.expand();
-  renderIssuesPanel(state.score);
-}
-
-function collapsePanel() {
-  setMode("cat");
-  window.shrink.collapse();
-  updatePet(state.score);
-  setBubbleVisible(false);
-}
-
-// ── Event handlers ────────────────────────────────────────────────────────────
-
-function handleAction() {
-  if (state.phase === "issues") {
-    renderLoading();
+    let result;
     try {
-      window.shrink.generate();
-    } catch (error) {
-      console.error("Generate failed", error);
-      renderError();
+      result = await shrink.generateOptimized({ protectedRegions: regionsPayload });
+    } finally {
+      setBusyOverlay(false);
     }
-  }
-}
 
-function handleCopy() {
-  if (!state.optimized) return;
-  try {
-    window.shrink.copy(elements.optimizedEditor.value);
-    resetCopyTimer();
-    elements.copyButton.textContent = "✓";
-    elements.copyButton.title = "Copied";
-    elements.copyButton.setAttribute("aria-label", "Copied optimized prompt");
-    elements.copyButton.classList.add("is-active");
-    state.copyTimer = window.setTimeout(() => {
-      resetCopyTimer();
-    }, 1500);
-  } catch (error) {
-    console.error("Copy failed", error);
-  }
-}
-
-function handleRegenerate() {
-  if (state.phase !== "optimized") return;
-  renderLoading();
-  try {
-    window.shrink.generate();
-  } catch (error) {
-    console.error("Regenerate failed", error);
-    renderError();
-  }
-}
-
-function handleCollapseClick(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  collapsePanel();
-}
-
-function handleScoreReady(data) {
-  state.score = data;
-  hideIdleShock();
-  updatePet(data);
-  showBubbleBriefly();
-
-  if (state.mode === "panel") {
-    renderIssuesPanel(data);
-  } else {
-    const pointerDelta = getPointerDeltaFromCat();
-    if (pointerDelta && Math.hypot(pointerDelta.dx, pointerDelta.dy) <= HOVER_RADIUS) {
-      showScoreHover();
-      const hovered = getHoveredPetal(pointerDelta.dx, pointerDelta.dy);
-      if (hovered) showPetalTip(hovered);
-    }
-  }
-}
-
-function handleOptimizeReady(data) {
-  renderOptimized(data);
-}
-
-function handleScorerChange(event) {
-  state.selectedScorer = event.target.value;
-  if (state.mode === "panel" && state.score) {
-    if (state.phase === "optimized" && state.optimized) {
-      renderOptimized(state.optimized);
+    const body = pickOptimizedText(result);
+    if (body) {
+      showState2(result);
     } else {
-      renderIssuesPanel(state.score);
+      $('btnGenerate').disabled = false;
+      $('btnReplace').classList.add('hidden');
+      $('optimized').classList.remove('hidden');
+      $('optimized').innerHTML = '';
+      $('optimized').textContent = 'Generate failed or empty result';
     }
+  });
+
+  $('btnCopy').addEventListener('click', async () => {
+    const t = $('optimized').textContent || '';
+    await shrink.copyToClipboard({ text: t });
+    const b = $('btnCopy');
+    const prev = b.textContent;
+    b.textContent = 'Copied';
+    setTimeout(() => {
+      b.textContent = prev;
+    }, 900);
+  });
+
+  $('btnReplace').addEventListener('click', async () => {
+    const b = $('btnReplace');
+    b.disabled = true;
+    try {
+      const r = await shrink.replaceWithOptimized();
+      if (!r || r.ok === false) {
+        b.disabled = false;
+        return;
+      }
+    } catch {
+      b.disabled = false;
+    }
+  });
+
+  $('btnLog').addEventListener('click', () => shrink.openLog());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      shrink.closeWidget();
+    }
+  });
+}
+
+bootstrap().catch((e) => {
+  const host = $('originalHost');
+  if (host) {
+    host.innerHTML = '';
+    host.textContent = String(e && e.message ? e.message : e);
   }
-}
-
-function handleDraftInput() {
-  resetDraftScoreTimer();
-  state.draftScoreTimer = window.setTimeout(() => {
-    state.score = {
-      ...MOCK_SCORE,
-      clarity: 4.6,
-      safety: 5.0,
-      emotionalBalance: 4.8,
-      total: 4.8,
-      summary: "Edited draft is clearer and ready to send.",
-    };
-    elements.panelScoreline.textContent = `${formatTotal(state.score.total)} / 5.0`;
-    renderCompactMetrics(state.score);
-    updatePet(state.score);
-  }, 3000);
-}
-
-function handleQuit() {
-  try {
-    window.shrink.quit();
-  } catch (error) {
-    console.error("Quit failed", error);
-  }
-}
-
-function handleKeydown(event) {
-  if (event.key === "Escape" && state.mode === "panel") {
-    event.preventDefault();
-    collapsePanel();
-  }
-}
-
-function handleCatPointerDown(event) {
-  if (event.button !== 0) return;
-  if (event.target.closest(".pet__quit")) return;
-
-  const shellRect = elements.shell.getBoundingClientRect();
-  state.drag.active = true;
-  state.drag.pointerId = event.pointerId;
-  state.drag.offsetX = event.clientX - shellRect.left;
-  state.drag.offsetY = event.clientY - shellRect.top;
-  state.drag.startX = event.clientX;
-  state.drag.startY = event.clientY;
-  state.drag.moved = false;
-  elements.shell.classList.add("is-dragging");
-  elements.catWrap.setPointerCapture(event.pointerId);
-}
-
-function handleCatPointerMove(event) {
-  if (!state.drag.active || event.pointerId !== state.drag.pointerId) return;
-
-  const deltaX = event.clientX - state.drag.startX;
-  const deltaY = event.clientY - state.drag.startY;
-
-  if (!state.drag.moved && Math.hypot(deltaX, deltaY) > 4) {
-    state.drag.moved = true;
-  }
-
-  if (state.drag.moved) {
-    event.preventDefault();
-    setShellPosition(event.clientX - state.drag.offsetX, event.clientY - state.drag.offsetY);
-  }
-}
-
-function handleCatPointerUp(event) {
-  if (!state.drag.active || event.pointerId !== state.drag.pointerId) return;
-
-  if (state.drag.moved) {
-    state.drag.suppressClick = true;
-    window.setTimeout(() => {
-      state.drag.suppressClick = false;
-    }, 0);
-  }
-
-  state.drag.active = false;
-  state.drag.pointerId = null;
-  elements.shell.classList.remove("is-dragging");
-
-  try {
-    elements.catWrap.releasePointerCapture(event.pointerId);
-  } catch (error) {
-    // Pointer capture may already be released if the pointer was cancelled.
-  }
-}
-
-function handleCatClick(event) {
-  if (event.target.closest(".pet__quit")) return;
-
-  if (state.drag.suppressClick) {
-    event.preventDefault();
-    event.stopPropagation();
-    state.drag.suppressClick = false;
-    return;
-  }
-
-  openPanel();
-}
-
-function handleViewportResize() {
-  const rect = elements.shell.getBoundingClientRect();
-  setShellPosition(rect.left, rect.top);
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-
-function init() {
-  setMode("cat");
-  setPhase("issues");
-  updatePet(null);
-  setBubbleVisible(false);
-
-  elements.petBubble.addEventListener("click", openPanel);
-  elements.petalTip.addEventListener("click", () => { hidePetalTip(); openPanel(); });
-  elements.originalField.addEventListener("mouseup", handleOriginalMouseUp);
-  elements.originalField.addEventListener("click", handleOriginalClick);
-  elements.catWrap.addEventListener("pointerdown", handleCatPointerDown);
-  elements.catWrap.addEventListener("pointermove", handleCatPointerMove);
-  elements.catWrap.addEventListener("pointerup", handleCatPointerUp);
-  elements.catWrap.addEventListener("pointercancel", handleCatPointerUp);
-  elements.catWrap.addEventListener("click", handleCatClick);
-  document.addEventListener("pointermove", handlePointerMove);
-  document.addEventListener("click", handleDocumentClick);
-  elements.collapseButton.addEventListener("click", handleCollapseClick);
-  elements.quitButton.addEventListener("click", handleQuit);
-  elements.actionButton.addEventListener("click", handleAction);
-  elements.copyButton.addEventListener("click", handleCopy);
-  elements.regenerateButton.addEventListener("click", handleRegenerate);
-  elements.scorerSelect.addEventListener("change", handleScorerChange);
-  elements.optimizedEditor.addEventListener("input", handleDraftInput);
-  window.addEventListener("keydown", handleKeydown);
-  window.addEventListener("resize", handleViewportResize);
-
-  window.shrink.onScoreReady(handleScoreReady);
-  window.shrink.onOptimizeReady(handleOptimizeReady);
-}
-
-init();
+});

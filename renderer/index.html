@@ -2,101 +2,54 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Shrink Renderer</title>
+    <title>The Shrink</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body class="mode-cat phase-issues">
-    <div class="shell" id="shell">
-      <div class="pet-shell" id="petShell">
-        <div class="pet" id="pet">
-          <button class="pet__bubble" id="petBubble" type="button" aria-label="Open prompt review panel">
-            Waiting for score…
-          </button>
-
-          <div class="pet__cat-wrap">
-            <button class="pet__quit" id="quitButton" type="button" aria-label="Quit app">✕</button>
-            <img class="pet__cat" id="catFace" src="./cats/cat_happy.png" alt="cat" />
-            <div class="score-hover" id="scoreHover" aria-hidden="true" role="tooltip"></div>
-          </div>
-        </div>
+  <body>
+    <header class="hdr">
+      <div class="hdr-left">
+        <span id="scoreLabel">Score — / 5.0</span>
+        <span id="demoBadge" class="badge hidden">DEMO</span>
       </div>
+      <button type="button" id="btnClose" class="icon-btn" aria-label="Close">✕</button>
+    </header>
 
-      <section class="panel" id="panel" aria-hidden="true">
-        <button class="panel__close" id="collapseButton" type="button" aria-label="Collapse panel">✕</button>
-        <div class="panel__content">
-          <div class="panel__topline">
-            <label class="model-switch" for="scorerSelect">
-              <select class="model-switch__input" id="scorerSelect" aria-label="Scoring model">
-                <option value="Qwen2.5-7B">Qwen2.5-7B</option>
-                <option value="Qwen2.5-72B">Qwen2.5-72B</option>
-              </select>
-            </label>
-            <div class="panel__controls">
-              <div class="panel__scoreline" id="panelScoreline">– / 5.0</div>
-            </div>
+    <div id="safetyBanner" class="safety-banner hidden" role="status" aria-live="polite"></div>
+
+    <main class="stage">
+      <div id="loadingOverlay" class="loading-overlay hidden" aria-hidden="true">
+        <div class="loading-spinner" role="presentation"></div>
+        <p id="loadingMessage" class="loading-msg">Working…</p>
+      </div>
+      <div class="grid">
+        <section class="col">
+          <h2>Original</h2>
+          <p class="protect-hint">
+            在原文上拖选要<strong>一字不改保留</strong>的片段（可多次）；单击蓝色片段取消。安全分 &lt; 2.0 时保护会自动失效。
+          </p>
+          <div id="originalHost" class="box original-host" tabindex="-1">—</div>
+        </section>
+        <section class="col">
+          <h2 id="rightTitle">Issues</h2>
+          <ul id="flags" class="flags"></ul>
+          <ul id="changes" class="changes hidden"></ul>
+          <div id="optimized" class="box optimized-host hidden"></div>
+          <div class="actions">
+            <button type="button" id="btnGenerate" class="pill">Generate</button>
+            <button type="button" id="btnReplace" class="pill secondary hidden">Replace selection</button>
+            <button type="button" id="btnCopy" class="pill secondary hidden">Copy</button>
           </div>
+        </section>
+      </div>
+    </main>
 
-          <div class="panel__hero">
-            <div class="panel__title" id="panelTitle">Prompt feels unsettled</div>
-            <div class="panel__subtitle" id="panelSubtitle">Waiting for clipboard score…</div>
-          </div>
+    <footer class="ft">
+      <span id="hint"><span id="llmBadge" class="badge llm-mock">MOCK LLM</span> · Shrink Ctrl+R (or Ctrl+Alt+R / Ctrl+Shift+R if busy) · Ctrl+Shift+D · Esc</span>
+      <button type="button" id="btnLog" class="linkish">Open log</button>
+    </footer>
 
-          <div class="editor-section is-hidden" id="editorSection">
-            <div class="editor-section__header">
-              <div class="panel__eyebrow">Optimized prompt</div>
-              <div class="editor-section__tools" aria-label="Optimized prompt actions">
-                <button
-                  class="icon-button icon-button--copy is-hidden"
-                  id="copyButton"
-                  type="button"
-                  aria-label="Copy optimized prompt"
-                  title="Copy"
-                >⧉</button>
-                <button
-                  class="icon-button icon-button--ghost is-hidden"
-                  id="regenerateButton"
-                  type="button"
-                  aria-label="Regenerate optimized prompt"
-                  title="Regenerate"
-                >↻</button>
-              </div>
-            </div>
-            <textarea
-              class="editor-section__textarea"
-              id="optimizedEditor"
-              spellcheck="false"
-              aria-label="Optimized prompt"
-            ></textarea>
-            <div class="metric-strip" id="metricStrip"></div>
-          </div>
-
-          <div class="summary-block is-hidden" id="summaryBlock"></div>
-          <div class="issues-groups" id="issuesGroups"></div>
-          <div class="metric-detail is-hidden" id="metricDetail"></div>
-
-          <div class="original-section is-hidden" id="originalSection">
-            <div class="original-section__label">
-              <span class="panel__eyebrow">Your prompt</span>
-              <span class="original-section__hint">Drag to protect · click to remove</span>
-            </div>
-            <div
-              class="original-field"
-              id="originalField"
-              aria-label="Original prompt — drag to protect text"
-            ></div>
-          </div>
-        </div>
-
-        <footer class="panel__footer">
-          <button class="action-button action-button--primary" id="actionButton" type="button">
-            Optimize my input
-          </button>
-        </footer>
-      </section>
-    </div>
-
-    <div class="petal-tip" id="petalTip" aria-hidden="true" role="tooltip"></div>
     <script src="./app.js"></script>
   </body>
 </html>

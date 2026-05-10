@@ -1,5 +1,7 @@
 # The Shrink UI Design Notes
 
+> **Shipped product:** The Electron app loads **`renderer/index.html`** with **`app.js`** / **`styles.css`** — the floating score / optimize hover widget wired via `preload.js`. The cat companion notes below are an earlier Zoe-branch prototype and are **not** shown at runtime.
+
 ## Current Direction
 
 We are keeping the dark glassmorphism direction for the widget and panel.

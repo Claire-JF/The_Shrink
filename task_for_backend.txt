@@ -1,0 +1,151 @@
+> **NOTE (2026 maintenance):** Executable context for agents has moved to **`AGENT_CONTEXT.md`**. This file remains a useful *conceptual* split (Plumbing vs Brain) but filenames/paths below are not exact.
+
+## 后端两人分工（sponsor-agnostic）
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Backend-1: 基础设施层（Plumbing）            │
+│                                                         │
+│   Electron / 窗口 / 快捷键 / 选中捕获 / 剪贴板 /        │
+│   IPC / 状态 / 配置 / 日志 / 错误恢复                   │
+└─────────────────────────────────────────────────────────┘
+                          ↕ 干净接口
+┌─────────────────────────────────────────────────────────┐
+│              Backend-2: AI 逻辑层（Brain）               │
+│                                                         │
+│   LLM client (provider-agnostic) / scoring prompt /     │
+│   optimization prompt / JSON 验证 / 稳定性测试           │
+└─────────────────────────────────────────────────────────┘
+```
+
+切口的核心：Backend-2 写的所有东西**完全不知道**用的是 CLōD 还是 OpenAI 还是 Anthropic。它只接受一个 `LLMClient` 接口。这样后面接哪个 sponsor 都是改一行配置的事。
+
+---
+
+## Backend-1 — 基础设施层
+
+**Owner of:** `main.js`、`window.js`、`hotkey.js`、`selection.js`、`clipboard.js`、`ipc.js`、`state.js`、`config.js`、`logger.js`
+
+### 核心责任
+
+让"用户按 Cmd+T → 窗口出现 → 数据进流程 → 结果回到窗口 → 用户点 Copy → 优化版进剪贴板"这条链路稳如磐石，**完全不关心 LLM 那边在干什么**。
+
+### 任务清单
+
+| 时间 | 任务 |
+|------|------|
+| 11:30 | Electron app 启动；frameless 圆角窗口；alwaysOnTop；可拖拽 |
+| 12:00 | `globalShortcut`：Cmd+T、Cmd+Shift+S（强制）、Cmd+Shift+D（demo toggle） |
+| 12:30 | `selection.js`：保存剪贴板 → 模拟 Cmd+C → 读取 → 还原（在 ChatGPT、Cursor、Notes 三处测过）|
+| 13:00 | IPC 4 个频道全跑通；`state.js` 维护当前 selection / score / optimized |
+| 13:30 | 窗口出现在光标附近；Esc 和 ✕ 关窗 |
+| 14:00 | `clipboard.writeOptimized(text)` 接口（用户点 Copy 时调用）|
+| 14:30 | demo mode flag 全局生效（关掉阈值，永远展开）|
+| 15:00 | `Cmd+Shift+S` 强制触发：跳过阈值，永远调流程 |
+| 15:30 | `logger.js`：所有 IPC、所有外部调用记录到本地文件 |
+| 16:00 | 错误恢复演练：LLM 超时、网络断开、解析失败三种情况下都不崩 |
+| 16:30+ | 不同 app 兼容性回归测试；准备 demo |
+
+### 关键约定
+
+- **Backend-2 不应该看到 robotjs / clipboard / globalShortcut 这些字眼**。Backend-1 把它们封装成干净接口
+- **配置统一走 config.js**：API key、demo flag、阈值、所有可调参数
+- **state 在 main process 里维护**，renderer 是 dumb view
+
+### 暴露给 Backend-2 的接口
+
+```typescript
+// 只有这三个，其他细节都隐藏
+selection.captureSelection(): Promise<{ text, sourceApp }>
+clipboard.writeOptimized(text): Promise<void>
+config.get(key): any
+```
+
+---
+
+## Backend-2 — AI 逻辑层（provider-agnostic）
+
+**Owner of:** `llm/client.js`、`scorer.js`、`optimizer.js`、`schema.js`、`fallback.js`、`warmup.js`、`stability-test.js`
+
+### 核心责任
+
+让"一段文字进来 → 5 维分数出去"和"一段文字 + 分数进来 → 优化版出去"这两件事 100% 可靠，**不管底层用的是哪家 LLM**。
+
+### 任务清单
+
+| 时间 | 任务 |
+|------|------|
+| 11:30 | `llm/client.js` 接口定义：`call(model, prompt, opts) → Promise<string>`。先写一个 mock 实现返回 hardcoded JSON |
+| 12:00 | 选定 LLM provider，写真实 client 实现（OpenAI-compatible 通用模板，CLōD 直接能用，OpenAI 也能用）|
+| 12:30 | scoring prompt 第一版：用 **checklist 格式**，5 个维度每个写明确判定规则 |
+| 13:00 | `scorer.js` 跑通：输入文本 → 输出 score JSON。`schema.js` 验证、`fallback.js` 容错 |
+| 13:30 | 稳定性初测：同一个 prompt 跑 5 次，total 分数方差 < 0.3 |
+| 14:00 | optimization prompt 第一版；`optimizer.js` 跑通 |
+| 14:30 | 两个 demo prompt 手工挑定（vague + danger），写进固定的测试 fixture |
+| 15:00 | `warmup.js`：app 启动时调一次任意请求，预热连接 |
+| 15:30 | **`stability-test.js`：独立脚本，两个 demo prompt 各跑 20 次，输出每次分数。要求 vague 全部 < 2.5，danger 全部 < 1.0** |
+| 16:00 | 如果 stability test 不过，回头改 scoring prompt 加更严的 checklist，再跑 20 次 |
+| 16:30+ | 性能优化：scoring 调用缩短到 < 1.5s（换更快的 model 或精简 prompt）|
+
+### 关键约定
+
+- **client 抽象不能漏**：所有 `scorer.js` 和 `optimizer.js` 都通过 `llmClient.call()`，永远不直接 fetch
+- **temperature 0 on scoring**，0.2 on optimization
+- **prompt 用 checklist 不用自由判断**，这是稳定性的最大杠杆
+- **永远返回有效对象**，解析失败走 fallback
+
+### 暴露给 Backend-1 的接口
+
+```typescript
+scorer.score(text): Promise<ScoreJSON>
+optimizer.optimize(text, scoreResult): Promise<OptimizedJSON>
+warmup.warmup(): Promise<void>  // 启动时调一次
+```
+
+---
+
+## 两人怎么并行不阻塞
+
+**11:30 之前两人各自写 stub：**
+
+- Backend-1 的 `selection.captureSelection()` 先返回硬编码字符串
+- Backend-2 的 `scorer.score()` 先返回硬编码 JSON
+
+这样两边都能独立测自己的代码。**13:00 第一次联调时把 stub 换成真实实现，无缝切换。**
+
+---
+
+## LLM provider 抽象的具体好处
+
+```javascript
+// llm/client.js
+class LLMClient {
+  constructor(config) {
+    this.baseURL = config.baseURL;     // 换 provider 改这里
+    this.apiKey = config.apiKey;
+    this.headers = config.headers;
+  }
+  async call(model, prompt, opts) { /* 通用实现 */ }
+}
+
+// config.js
+export const llmConfig = {
+  baseURL: process.env.LLM_BASE_URL,    // CLōD / OpenAI / Anthropic 改 .env 就行
+  apiKey: process.env.LLM_API_KEY,
+  fastModel: process.env.LLM_FAST_MODEL,
+  deepModel: process.env.LLM_DEEP_MODEL
+};
+```
+
+**好处：**
+1. 今天上午先用 OpenAI 把流程跑通（如果 OpenAI key 团队已有），下午再切 CLōD 也只是改 .env
+2. 现场 CLōD 出问题（rate limit、网络）能秒切回 OpenAI
+3. Backend-2 不用等 sponsor 那边的事情确认，可以提前开干
+
+---
+
+## 一句话总结
+
+**Backend-1 让"app 这个东西"工作。Backend-2 让"AI 这件事"靠谱。** 两人之间通过 4 个干净接口隔离，LLM provider 是个配置项不是架构决策。
+
+要把这个写进 TECH_ARCHITECTURE.md 替换原来的 Person A/B 那一节吗？
