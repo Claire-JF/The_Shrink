@@ -59,10 +59,14 @@ button {
   box-sizing: border-box;
 }
 
-/* Cat-only: tight width like a desktop float orb; panel hidden from layout */
+/* Cat-only: tight width like a desktop float orb; panel hidden from layout.
+   pet-shell is position:absolute — without min size the shell collapses to 0×0 and
+   Electron shrinks the window smaller than the cat asset (invisible / clipped). */
 body.mode-cat .shell {
   width: max-content;
   max-width: min(360px, calc(100vw - 16px));
+  min-width: 240px;
+  min-height: calc(var(--cat-size) + 20px);
 }
 
 body.mode-panel .shell {

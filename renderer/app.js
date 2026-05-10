@@ -317,11 +317,15 @@ function scheduleSyncOrbWindow() {
   syncOrbTimer = window.setTimeout(() => {
     syncOrbTimer = null;
     const el = elements.shell;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    if (w > 0 && h > 0) {
-      shrink.syncOrbContentSize({ width: w, height: h, keepTopRight: true });
-    }
+    const br = el.getBoundingClientRect();
+    /* Absolute-positioned cat does not always inflate offsetHeight — use scroll + bounding box. */
+    const w = Math.ceil(Math.max(el.offsetWidth, el.scrollWidth, br.width));
+    const h = Math.ceil(Math.max(el.offsetHeight, el.scrollHeight, br.height));
+    shrink.syncOrbContentSize({
+      width: Math.max(w, 1),
+      height: Math.max(h, 1),
+      keepTopRight: true,
+    });
   }, 48);
 }
 

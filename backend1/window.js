@@ -1,6 +1,7 @@
 /**
- * Floating widget window — transparent canvas, always-on-top, frameless (Windows-first).
- * Chrome is drawn in the renderer (`.shell` / `.panel`); the rest of the window is see-through.
+ * Floating widget — frameless, always-on-top.
+ * Linux defaults to an opaque dark canvas so the orb stays visible when GPU/compositors
+ * break transparency (`SHRINK_GLASS=1` restores transparent window).
  */
 const { BrowserWindow, screen } = require('electron');
 const path = require('path');
@@ -64,8 +65,9 @@ function syncOrbContentSize(contentWidth, contentHeight, options = {}) {
   if (!win || win.isDestroyed()) return;
 
   const pad = 16;
-  const w = Math.max(96, Math.ceil(Number(contentWidth) + pad));
-  const h = Math.max(64, Math.ceil(Number(contentHeight) + pad));
+  /* Never shrink below orb + bubble (cat PNG is 112px). */
+  const w = Math.max(240, Math.ceil(Number(contentWidth) + pad));
+  const h = Math.max(148, Math.ceil(Number(contentHeight) + pad));
 
   const b = win.getBounds();
   let x;
@@ -114,13 +116,23 @@ function getWindowBounds() {
   return win.getBounds();
 }
 
+function useTransparentBrowserWindow() {
+  if (process.env.SHRINK_GLASS === '1') return true;
+  if (process.env.SHRINK_OPAQUE === '1') return false;
+  /* Linux: transparent windows often render fully invisible with GPU/compositor issues. */
+  if (process.platform === 'linux') return false;
+  return true;
+}
+
 function createWindow() {
   const preload = path.join(__dirname, '..', 'preload.js');
   const indexHtml = path.join(__dirname, '..', 'renderer', 'index.html');
 
+  const transparent = useTransparentBrowserWindow();
+
   /* Start tight — renderer ResizeObserver expands after first layout (orb-only size). */
   const width = 280;
-  const height = 160;
+  const height = 176;
   const initial = getTopRightBounds(width, height);
 
   mainWindow = new BrowserWindow({
@@ -133,10 +145,9 @@ function createWindow() {
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
-    transparent: true,
+    transparent,
     hasShadow: true,
-    // Canvas stays visually transparent; shell/panel draw their own chrome (renderer/styles.css).
-    backgroundColor: '#00000000',
+    backgroundColor: transparent ? '#00000000' : '#141824',
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -148,6 +159,14 @@ function createWindow() {
   // Stronger stay-above on macOS (still respects fullscreen spaces behavior).
   if (process.platform === 'darwin') {
     mainWindow.setAlwaysOnTop(true, 'floating');
+  }
+
+  try {
+    if (typeof mainWindow.setVisibleOnAllWorkspaces === 'function') {
+      mainWindow.setVisibleOnAllWorkspaces(true);
+    }
+  } catch {
+    /* optional API */
   }
 
   const b = mainWindow.getBounds();
@@ -175,6 +194,9 @@ function createWindow() {
 
 function showWindow() {
   if (!mainWindow) return;
+  if (typeof mainWindow.setOpacity === 'function') {
+    mainWindow.setOpacity(1);
+  }
   mainWindow.show();
   mainWindow.focus();
   if (typeof mainWindow.moveTop === 'function') {
@@ -188,6 +210,9 @@ function showWindow() {
  */
 function showWindowInactive() {
   if (!mainWindow) return;
+  if (typeof mainWindow.setOpacity === 'function') {
+    mainWindow.setOpacity(1);
+  }
   if (typeof mainWindow.showInactive === 'function') {
     mainWindow.showInactive();
   } else {
