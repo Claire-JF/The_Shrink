@@ -2,13 +2,13 @@
 
 > **Audience:** Humans or downstream agents picking up implementation. Read this **before** trusting older narrative-only docs verbatim.
 >
-> **Last aligned with codebase:** Electron hover widget + Windows UI Automation selection (with clipboard fallback) + protected-region optimize + `main.js` loads `.env` from repo root.
+> **Last aligned with codebase:** Electron **cat companion** UI (`renderer/` + `preload.js`) + Windows UI Automation selection (with clipboard fallback) + protected-region optimize + `main.js` loads `.env` from repo root.
 
 ## One-liners
 
 | Surface | Purpose |
 |---------|---------|
-| **Hover widget** | Global capture + score pipeline. User selects text elsewhere, presses **Ctrl+R** → selection is read → Backend-2 **`score`** → widget shows; user may mark **protected spans** in the original column before **Generate** → **`optimize`** with `{ protectedRegions }`. |
+| **Cat companion window** | Global capture + score pipeline. User selects text elsewhere, presses **Ctrl+R** → selection is read → Backend-2 **`score`** → cat + panel; user may mark **protected spans** in the original column before **Optimize** → **`optimize`** with `{ protectedRegions }`. |
 | **Replace selection** | After Generate, pastes optimized text into the app that had focus at capture time (Windows: HWND + Ctrl+V; else clipboard + close). |
 | **Backend-2 (`src/`)** | Pure ESM JS: **`score`** / **`optimize`**, optional **`{ protectedRegions }`**, **`warmup`** / **`chat`**, OpenAI-compat **`createClient`** + **`createMockClient`**. Loaded via **`backend1/brain.js`** dynamic `import()`. |
 

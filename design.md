@@ -1,6 +1,6 @@
 # The Shrink UI Design Notes
 
-> **Shipped product:** The Electron app loads **`renderer/index.html`** with **`app.js`** / **`styles.css`** — the floating score / optimize hover widget wired via `preload.js`. The cat companion notes below are an earlier Zoe-branch prototype and are **not** shown at runtime.
+> **Shipped product:** The Electron app loads **`renderer/index.html`** — the **cat companion** shell (`app.js`, `styles.css`, `cats/`) wired via **`preload.js`** (`window.shrink`). Earlier “hover card only” layouts are obsolete.
 
 ## Current Direction
 
