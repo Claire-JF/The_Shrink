@@ -42,13 +42,21 @@ function enrichResult(data, originalText, regions, safetyOverride) {
   const outputRegions = regions.map(r => {
     const originalSnippet = originalText.slice(r.start, r.end);
     const newStart = data.optimizedText.indexOf(originalSnippet);
-    if (newStart === -1) return null;
+    if (newStart === -1) {
+      return {
+        start: -1,
+        end: -1,
+        originalText: originalSnippet,
+        preserved: false,
+      };
+    }
     return {
       start: newStart,
       end: newStart + originalSnippet.length,
       originalText: originalSnippet,
+      preserved: true,
     };
-  }).filter(Boolean);
+  });
 
   return {
     ...data,
