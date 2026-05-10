@@ -1,4 +1,4 @@
-const SCORE_DIMENSIONS = ['clarity', 'specificity', 'safety', 'tone', 'actionability'];
+const SCORE_DIMENSIONS = ['clarity', 'emotionalBalance', 'safety'];
 
 function isNumberInRange(val, min, max) {
   return typeof val === 'number' && !Number.isNaN(val) && val >= min && val <= max;
@@ -34,10 +34,8 @@ export function validateScore(obj) {
     valid: true,
     data: {
       clarity: dimsVals[0],
-      specificity: dimsVals[1],
+      emotionalBalance: dimsVals[1],
       safety: dimsVals[2],
-      tone: dimsVals[3],
-      actionability: dimsVals[4],
       total,
       summary: obj.summary.trim(),
     },

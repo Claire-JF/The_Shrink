@@ -31,7 +31,7 @@ Call once on app startup. **Never throws** — logs a warning on failure and res
 
 ### `score(text, client, config) → Promise<ScoreJSON>`
 
-Scores input on five quality dimensions. Uses `config.fastModel` at temperature 0 (with JSON mode in implementation).
+Scores input on three quality dimensions (clarity, emotionalBalance, safety). Uses `config.fastModel` at temperature 0 (with JSON mode in implementation).
 
 ### `optimize(text, scoreResult, client, config, options?) → Promise<OptimizedJSON>`
 
@@ -61,17 +61,21 @@ Multi-turn assistant (optional product feature). Uses `config.chatModel` or `con
 
 ```json
 {
-  "clarity": 3.3,
-  "specificity": 1.7,
+  "clarity": 2.1,
+  "emotionalBalance": 3.8,
   "safety": 5.0,
-  "tone": 4.2,
-  "actionability": 2.0,
-  "total": 3.24,
-  "summary": "Text is vague and lacks specific details"
+  "total": 3.63,
+  "summary": "Vague ask; emotionally neutral; safe to help"
 }
 ```
 
-All dimension values are **0.0–5.0**. **`total`** is the mean of the five dimensions. **`summary`** is one line.
+| Field | Meaning |
+|-------|---------|
+| `clarity` | How clear and actionable the request is (0–5). |
+| `emotionalBalance` | How objective and non-coercive the tone is; higher = more professional (0–5). |
+| `safety` | Risk / harm of complying; higher = safer (0–5). |
+
+All dimension values are **0.0–5.0**. **`total`** is the mean of the three dimensions. **`summary`** is one line.
 
 ### OptimizedJSON
 

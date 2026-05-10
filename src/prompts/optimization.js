@@ -15,7 +15,7 @@ Respond with ONLY one JSON object in this exact shape (use real values, not plac
 {"optimizedText":"<structured prompt body — see below>","changes":["2–5 short bullets: what you changed and which score dimension improved"],"safetyOverride":false,"protectedRegions":[{"start":0,"end":0,"originalText":"verbatim substring of optimizedText"}]}
 
 - optimizedText: string using the section layout below.
-- changes: array of 2–5 non-empty strings (each should mention at least one of: clarity, specificity, safety, tone, actionability where relevant).
+- changes: array of 2–5 non-empty strings (each should mention at least one of: clarity, emotionalBalance, safety where relevant).
 - safetyOverride: boolean (true only when user message says SAFETY OVERRIDE or you were told to ignore protections).
 - protectedRegions: array; each item has UTF-16 code unit indices start/end into optimizedText and originalText equal to optimizedText.slice(start,end). Use [] if there are no preserved verbatim spans.
 
@@ -40,9 +40,9 @@ Shape, length, bullets vs prose, schema of the answer.
 
 Simple prompts may only need ### Task and ### Output format.
 
-## Scores (five dimensions, 0–5 each)
+## Scores (three dimensions, 0–5 each)
 
-The user sends clarity, specificity, safety, tone, actionability. Address the lowest scores first; cite dimensions in changes[].
+The user sends clarity, emotionalBalance, safety. Address the lowest scores first; cite dimensions in changes[].
 
 ## Protected text (<<PROTECTED>>...<</PROTECTED>>) in the user message
 
@@ -53,10 +53,10 @@ The user sends clarity, specificity, safety, tone, actionability. Address the lo
 ## Quality rules
 
 - Low safety: remove destructive / irreversible risk; offer a safer way to meet the goal.
-- Low tone or actionability: remove manipulation; add concrete, testable steps.
-- Prefer clarity and specificity: named entities, scope boundaries, done-when criteria.`;
+- Low emotionalBalance: remove coercion, threats, guilt-tripping; restate requests professionally.
+- Low clarity: add specifics, scope, entities, and explicit output criteria.`;
 
-const DIM_KEYS = ['clarity', 'specificity', 'safety', 'tone', 'actionability'];
+const DIM_KEYS = ['clarity', 'emotionalBalance', 'safety'];
 
 /** @param {object|null|undefined} scoreResult */
 function weakestLabels(scoreResult, max = 3) {

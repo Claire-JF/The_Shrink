@@ -167,13 +167,11 @@ function renderOptimizedHost(fullText, protectedRegionsMeta) {
   appendTextFragment(el, fullText.slice(cursor));
 }
 
-const DIM_KEYS = ['clarity', 'specificity', 'safety', 'tone', 'actionability'];
+const DIM_KEYS = ['clarity', 'emotionalBalance', 'safety'];
 const DIM_LABEL = {
   clarity: 'Clarity',
-  specificity: 'Specificity',
+  emotionalBalance: 'Emotional balance',
   safety: 'Safety',
-  tone: 'Tone',
-  actionability: 'Actionability',
 };
 
 function renderScoreDetails(score) {
