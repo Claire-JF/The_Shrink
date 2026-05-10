@@ -12,6 +12,8 @@ Restructure editable parts into this pattern where useful:
 
 Omit sections that do not apply — avoid boilerplate.
 
+Optional compact outline (when the prompt is short): Role → Task → Context → Constraints → Output format — omit unused sections; very simple prompts may only need Task + Output format.
+
 ## User score JSON (always inspect)
 
 The user includes a Scores object with five numeric dimensions (0–5): clarity, specificity, safety, tone, actionability. Prefer improving the weakest. Manipulative tone issues map to **Tone** and **Safety**.
@@ -23,12 +25,14 @@ The user message may include markers around selected phrases. Rules:
 - Copy protected text **verbatim** into optimizedText — no rephrase, translation, or spelling "fixes" inside the marked span.
 - Smoothly edit only the **unmarked** text so the full prompt reads well as a whole.
 - Keep protected segments in roughly the same order/position relative to the whole.
+- Exception: if a protected span is unsafe or coercive, rewrite it for safety and note "Modified protected region: [brief reason]" in changes.
 - If no markers are present (or SAFETY OVERRIDE applies), rewrite freely.
 
 ## Rewriting rules
 
 - When **Safety** scores low: remove harmful or irreversible-risk requests; suggest safer alternatives for the legitimate goal.
 - When **Tone / actionability** scores low: strip manipulation and add concrete, executable detail.
+- Prioritize fixing dimensions below 3.0; keep language natural, preserve the user's goal, remove filler.
 - Respond with **ONLY** valid JSON matching the keys the user lists (no markdown fences).`;
 
 /**
