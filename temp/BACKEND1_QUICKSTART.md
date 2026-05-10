@@ -110,7 +110,7 @@ undefined  // 或 null 或 []
   "changes": ["改动说明1", "改动说明2"],
   "safetyOverride": false,
   "protectedRegions": [
-    { "start": 709, "end": 721, "originalText": "我现在脑子已经有点炸了。" }
+    { "start": 709, "end": 721, "originalText": "我现在脑子已经有点炸了。", "preserved": true }
   ]
 }
 ```
@@ -120,9 +120,13 @@ undefined  // 或 null 或 []
 | `optimizedText` | string | AI 重写后的完整文本（结构化的 AI-Intent 格式） |
 | `changes` | string[] | 改动说明（2-5 条） |
 | `safetyOverride` | boolean | `true` = 因安全原因忽略了所有保护区域 |
-| `protectedRegions` | array | 被保护文本在 optimizedText 中的新位置 + 原文 |
+| `protectedRegions` | array | 每个保护区域的状态（见下方字段） |
+| `protectedRegions[].start` | number | 保护文本在 optimizedText 中的新起始位置（被 AI 改写时为 -1） |
+| `protectedRegions[].end` | number | 保护文本在 optimizedText 中的新结束位置（被 AI 改写时为 -1） |
+| `protectedRegions[].originalText` | string | 用户原始划选的文本 |
+| `protectedRegions[].preserved` | boolean | `true` = 原样保留，`false` = AI 因 safety/emotion 问题改写了 |
 
-### 三种场景
+### 四种场景
 
 **场景 A：用户没有划选保护区域**
 - 传 `undefined` / `null` / `[]` 都行
@@ -132,12 +136,18 @@ undefined  // 或 null 或 []
 **场景 B：用户划选了保护区域，且内容安全**
 - 保护区域原封不动保留在输出中
 - 其余部分被重写为 AI-Intent 结构化格式
-- 返回 `safetyOverride: false, protectedRegions: [{ start, end, originalText }]`
+- 返回 `protectedRegions: [{ start, end, originalText, preserved: true }]`
 
 **场景 C：用户划选了保护区域，但 safety 评分 < 2.0**
 - 保护被自动覆盖（Safety Override），AI 正常改写全文
 - 返回 `safetyOverride: true, protectedRegions: []`
 - Frontend 应提示用户："因安全原因，保护区域已被忽略"
+
+**场景 D：用户划选了保护区域，但该区域本身有 safety/emotion 问题**
+- AI 判断某个 protected region 包含有害内容或情绪操控，选择改写该区域
+- 返回 `protectedRegions: [{ start: -1, end: -1, originalText, preserved: false }]`
+- `changes` 数组中会包含 "Modified protected region: [原因]" 的说明
+- Frontend 建议：用橙色高亮标记被 AI 改写的区域，tooltip 显示改写原因
 
 **注意：**
 - 需要把 Step 2 的 `scoreResult` 原样传进来（optimizer 需要知道哪些维度低）
@@ -165,7 +175,8 @@ undefined  // 或 null 或 []
 │  5. 用户点 Generate                                              │
 │  6. ipcRenderer.invoke('optimize-text', text, scores, regions)   │
 │  7. 收到 OptimizedJSON → 显示优化文本 + changes + 保护区域高亮   │
-│  8. 如果 safetyOverride === true → 显示安全覆盖提示              │
+│  8a. 如果 safetyOverride === true → 显示安全覆盖提示             │
+│  8b. 如果某区域 preserved === false → 显示该区域被 AI 改写提示   │
 │  9. 用户点 Copy → ipcRenderer.invoke('copy-text', optimizedText) │
 └──────────────────────────────────────────────────────────────────┘
                           ↕ IPC

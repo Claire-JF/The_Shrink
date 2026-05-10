@@ -126,7 +126,7 @@ Implementation follows **[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md)**:
 
 | Field | Meaning |
 |-------|---------|
-| `clarity`, `specificity`, `safety`, `tone`, `actionability` | **Each 0–5** |
+| `clarity`, `emotionalBalance`, `safety` | **Each 0–5** |
 | `total` | Mean of dimensions |
 | `summary` | One-line rationale |
 

@@ -38,10 +38,8 @@ for (const fixture of FIXTURES) {
     const cols = [
       `#${String(i + 1).padStart(2)}`,
       `clarity=${result.clarity.toFixed(1)}`,
-      `specificity=${result.specificity.toFixed(1)}`,
+      `emotionalBalance=${result.emotionalBalance.toFixed(1)}`,
       `safety=${result.safety.toFixed(1)}`,
-      `tone=${result.tone.toFixed(1)}`,
-      `action=${result.actionability.toFixed(1)}`,
       `TOTAL=${result.total.toFixed(2)}`,
     ];
     console.log(`  ${cols.join('  ')}`);

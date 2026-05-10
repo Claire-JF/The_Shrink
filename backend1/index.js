@@ -7,24 +7,38 @@ const config = require('./config');
 const brain = require('./brain');
 const windowMod = require('./window');
 const hotkey = require('./hotkey');
-const { registerIpc, runCaptureFlow } = require('./ipc');
+const {
+  registerIpc,
+  runCaptureSelectionPhase,
+  scoreCapturedText,
+} = require('./ipc');
 
 /**
  * Deliver renderer payload once webContents can receive IPC, then reveal the hover window.
+ * Returns a Promise that settles after the first IPC send is scheduled (after load if needed).
+ * @param {{ activate?: boolean }} [opts] activate:false → showInactive (keep host app focused during capture).
  */
-function presentWhenReady(win, envelope) {
-  const send = () => {
-    if (!win.isDestroyed()) {
-      win.webContents.send('shrink:presentation', envelope);
-      windowMod.showWindow();
-    }
-  };
+function presentWhenReady(win, envelope, opts = {}) {
+  const activate = opts.activate !== false;
+  return new Promise((resolve) => {
+    const send = () => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('shrink:presentation', envelope);
+        if (activate) {
+          windowMod.showWindow();
+        } else {
+          windowMod.showWindowInactive();
+        }
+      }
+      resolve();
+    };
 
-  if (win.webContents.isLoading()) {
-    win.webContents.once('did-finish-load', send);
-  } else {
-    send();
-  }
+    if (win.webContents.isLoading()) {
+      win.webContents.once('did-finish-load', send);
+    } else {
+      send();
+    }
+  });
 }
 
 async function onShrinkHotkey(forced) {
@@ -36,29 +50,67 @@ async function onShrinkHotkey(forced) {
   if (!win || win.isDestroyed()) return;
 
   /**
-   * Run capture + score BEFORE showing the hover window so the foreground app
-   * keeps focus for UI Automation / Ctrl+C selection (Electron must not activate first).
+   * 1) Pop the hover shell immediately (inactive — host app stays focused for UIA / Ctrl+C).
+   * 2) Capture selection, then focus the widget and show text while scoring.
    */
-  let result;
+  await presentWhenReady(
+    win,
+    {
+      type: 'capture',
+      payload: { loading: true, phase: 'selection' },
+    },
+    { activate: false },
+  );
+
+  let partial;
   try {
-    result = await runCaptureFlow({ forced });
+    partial = await runCaptureSelectionPhase({ forced });
   } catch (e) {
-    logger.error('runCaptureFlow failed', { message: e.message });
-    result = {
-      capturedText: '',
-      sourceApp: 'error',
-      score: brain.fallbackScore(),
-      openWidget: true,
-      error: e.message,
-    };
+    logger.error('runCaptureSelectionPhase failed', { message: e.message });
+    await presentWhenReady(win, {
+      type: 'capture',
+      payload: {
+        loading: false,
+        capturedText: '',
+        sourceApp: 'error',
+        score: brain.fallbackScore(),
+        error: e.message,
+      },
+    });
+    return;
   }
 
-  if (!result.openWidget) {
+  if (!partial.openWidget) {
     windowMod.hideWindow();
     return;
   }
 
-  presentWhenReady(win, { type: 'capture', payload: result });
+  if (!win.isDestroyed()) {
+    windowMod.showWindow();
+    win.webContents.send('shrink:presentation', {
+      type: 'capture',
+      payload: {
+        loading: true,
+        phase: 'score',
+        capturedText: partial.capturedText,
+        sourceApp: partial.sourceApp,
+      },
+    });
+  }
+
+  const scoreResult = await scoreCapturedText(partial.capturedText);
+
+  if (!win.isDestroyed()) {
+    win.webContents.send('shrink:presentation', {
+      type: 'capture',
+      payload: {
+        loading: false,
+        capturedText: partial.capturedText,
+        sourceApp: partial.sourceApp,
+        score: scoreResult,
+      },
+    });
+  }
 }
 
 async function initBackend1() {

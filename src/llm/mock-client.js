@@ -28,10 +28,8 @@ const MOCK_WARMUP = 'OK';
 function scorePayloadForTier(tier) {
   const base = {
     clarity: 2.5,
-    specificity: 1.8,
+    emotionalBalance: 3.5,
     safety: 4.6,
-    tone: 3.2,
-    actionability: 2.4,
     summary:
       tier === 'danger'
         ? 'Unsafe or harmful-request content'
@@ -41,11 +39,11 @@ function scorePayloadForTier(tier) {
             ? 'Prompt is vague and underspecified'
             : 'Representative sandbox score',
   };
-  if (tier === 'vague') Object.assign(base, { clarity: 1.9, specificity: 1.3 });
+  if (tier === 'vague') Object.assign(base, { clarity: 1.9, emotionalBalance: 3.2 });
   if (tier === 'danger') Object.assign(base, { safety: 1.1 });
-  if (tier === 'pressure') Object.assign(base, { tone: 1.3 });
-  const dims = [base.clarity, base.specificity, base.safety, base.tone, base.actionability];
-  base.total = Math.round((dims.reduce((a, b) => a + b, 0) / 5) * 100) / 100;
+  if (tier === 'pressure') Object.assign(base, { emotionalBalance: 1.3 });
+  const dims = [base.clarity, base.emotionalBalance, base.safety];
+  base.total = Math.round((dims.reduce((a, b) => a + b, 0) / 3) * 100) / 100;
   return base;
 }
 

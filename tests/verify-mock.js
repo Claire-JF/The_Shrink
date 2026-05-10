@@ -6,7 +6,7 @@ import { warmup } from '../src/warmup.js';
 const client = createMockClient();
 const config = { fastModel: 'Qwen2.5 7B', deepModel: 'Qwen2.5 72B' };
 
-console.log('=== Mock Client Verification (INTEGRATION_CONTRACT 5 dimensions + optimize extras) ===\n');
+console.log('=== Mock Client Verification (INTEGRATION_CONTRACT 3 score dims + optimize extras) ===\n');
 
 // 1. Warmup
 console.log('1. warmup()');
@@ -18,15 +18,7 @@ console.log('2. score()');
 const scoreResult = await score('Test text for scoring', client, config);
 console.log('   Result:', JSON.stringify(scoreResult, null, 2));
 
-const scoreKeys = [
-  'clarity',
-  'specificity',
-  'safety',
-  'tone',
-  'actionability',
-  'total',
-  'summary',
-];
+const scoreKeys = ['clarity', 'emotionalBalance', 'safety', 'total', 'summary'];
 const missingScoreKeys = scoreKeys.filter((k) => !(k in scoreResult));
 const allScoreNumbers = scoreKeys.filter((k) => k !== 'summary').every((k) => typeof scoreResult[k] === 'number');
 const summaryIsString = typeof scoreResult.summary === 'string';

@@ -35,7 +35,10 @@ function shouldOpenWidget(scoreTotal) {
   return Number(scoreTotal) < config.get('scoreExpandThreshold');
 }
 
-async function runCaptureFlow({ forced }) {
+/**
+ * Selection + HWND into session state (runs after the hover shell may already be visible inactive).
+ */
+async function runCaptureSelectionPhase({ forced }) {
   const cap = await selection.captureSelection();
   const text = cap.text || '';
   state.setSelection(text);
@@ -43,27 +46,14 @@ async function runCaptureFlow({ forced }) {
   const hwnd = await readForegroundHWND();
   state.setSourceForegroundHwnd(hwnd);
 
-  let scoreResult;
-  try {
-    scoreResult = await brain.score(text);
-  } catch (e) {
-    logger.error('brain.score failed unexpectedly', { message: e.message });
-    scoreResult = brain.fallbackScore();
-  }
-
-  state.setScore(scoreResult);
   state.setOptimized(null);
+  state.setScore(null);
 
-  const total = scoreResult && scoreResult.total != null ? scoreResult.total : null;
-  // Always show the hover UI after capture: high-scoring prompts used to suppress the window
-  // and felt like Ctrl+R did nothing. Threshold/demo flags still drive the DEMO badge only.
   const open = true;
 
-  logger.info('capture-selection done', {
+  logger.info('capture-selection phase done', {
     textLength: text.length,
-    total,
     open,
-    meetsExpandThreshold: shouldOpenWidget(total),
     forced,
     demoMode: config.get('demoMode'),
   });
@@ -71,8 +61,41 @@ async function runCaptureFlow({ forced }) {
   return {
     capturedText: text,
     sourceApp: cap.sourceApp,
-    score: scoreResult,
     openWidget: open,
+  };
+}
+
+async function scoreCapturedText(text) {
+  let scoreResult;
+  try {
+    scoreResult = await brain.score(text);
+  } catch (e) {
+    logger.error('brain.score failed unexpectedly', { message: e.message });
+    scoreResult = brain.fallbackScore();
+  }
+  state.setScore(scoreResult);
+  return scoreResult;
+}
+
+async function runCaptureFlow({ forced }) {
+  const partial = await runCaptureSelectionPhase({ forced });
+  const scoreResult = await scoreCapturedText(partial.capturedText);
+
+  const total = scoreResult && scoreResult.total != null ? scoreResult.total : null;
+  logger.info('capture-selection done', {
+    textLength: partial.capturedText.length,
+    total,
+    open: partial.openWidget,
+    meetsExpandThreshold: shouldOpenWidget(total),
+    forced,
+    demoMode: config.get('demoMode'),
+  });
+
+  return {
+    capturedText: partial.capturedText,
+    sourceApp: partial.sourceApp,
+    score: scoreResult,
+    openWidget: partial.openWidget,
   };
 }
 
@@ -256,4 +279,6 @@ module.exports = {
   CHANNEL,
   shouldOpenWidget,
   runCaptureFlow,
+  runCaptureSelectionPhase,
+  scoreCapturedText,
 };
