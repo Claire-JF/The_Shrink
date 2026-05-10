@@ -16,25 +16,37 @@
       <button type="button" id="btnClose" class="icon-btn" aria-label="Close">✕</button>
     </header>
 
-    <main class="grid">
-      <section class="col">
-        <h2>Original</h2>
-        <pre id="original" class="box">—</pre>
-      </section>
-      <section class="col">
-        <h2 id="rightTitle">Issues</h2>
-        <ul id="flags" class="flags"></ul>
-        <ul id="changes" class="changes hidden"></ul>
-        <pre id="optimized" class="box hidden">—</pre>
-        <div class="actions">
-          <button type="button" id="btnGenerate" class="pill">Generate</button>
-          <button type="button" id="btnCopy" class="pill secondary hidden">Copy</button>
-        </div>
-      </section>
+    <div id="safetyBanner" class="safety-banner hidden" role="status" aria-live="polite"></div>
+
+    <main class="stage">
+      <div id="loadingOverlay" class="loading-overlay hidden" aria-hidden="true">
+        <div class="loading-spinner" role="presentation"></div>
+        <p id="loadingMessage" class="loading-msg">Working…</p>
+      </div>
+      <div class="grid">
+        <section class="col">
+          <h2>Original</h2>
+          <p class="protect-hint">
+            在原文上拖选要<strong>一字不改保留</strong>的片段（可多次）；单击蓝色片段取消。安全分 &lt; 2.0 时保护会自动失效。
+          </p>
+          <div id="originalHost" class="box original-host" tabindex="-1">—</div>
+        </section>
+        <section class="col">
+          <h2 id="rightTitle">Issues</h2>
+          <ul id="flags" class="flags"></ul>
+          <ul id="changes" class="changes hidden"></ul>
+          <div id="optimized" class="box optimized-host hidden"></div>
+          <div class="actions">
+            <button type="button" id="btnGenerate" class="pill">Generate</button>
+            <button type="button" id="btnReplace" class="pill secondary hidden">Replace selection</button>
+            <button type="button" id="btnCopy" class="pill secondary hidden">Copy</button>
+          </div>
+        </section>
+      </div>
     </main>
 
     <footer class="ft">
-      <span id="hint"><span id="llmBadge" class="badge llm-mock">MOCK LLM</span> · Ctrl+R ·条+球 Ctrl+Shift+W · Ctrl+Shift+D · Esc</span>
+      <span id="hint"><span id="llmBadge" class="badge llm-mock">MOCK LLM</span> · Shrink Ctrl+R (or Ctrl+Alt+R / Ctrl+Shift+R if busy) · Ctrl+Shift+D · Esc</span>
       <button type="button" id="btnLog" class="linkish">Open log</button>
     </footer>
 

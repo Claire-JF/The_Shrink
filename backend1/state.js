@@ -8,6 +8,9 @@ let lastScore = null;
 /** @type {object | null} */
 let lastOptimized = null;
 
+/** Win32 HWND of the foreground window right after capture (best-effort paste target). */
+let sourceForegroundHwnd = null;
+
 /** @type {{ role: string, content: string }[]} */
 let chatMessages = [];
 
@@ -17,6 +20,7 @@ function reset() {
   selectionText = '';
   lastScore = null;
   lastOptimized = null;
+  sourceForegroundHwnd = null;
 }
 
 function snapshotChatMessages() {
@@ -61,11 +65,21 @@ function getOptimized() {
   return lastOptimized;
 }
 
+function setSourceForegroundHwnd(n) {
+  const v = typeof n === 'number' ? n : Number(n);
+  sourceForegroundHwnd = Number.isFinite(v) && v > 0 ? v : null;
+}
+
+function getSourceForegroundHwnd() {
+  return sourceForegroundHwnd;
+}
+
 function snapshot() {
   return {
     selectionText,
     lastScore,
     lastOptimized,
+    sourceForegroundHwnd,
     chatMessages: snapshotChatMessages(),
   };
 }
@@ -78,6 +92,8 @@ module.exports = {
   getScore,
   setOptimized,
   getOptimized,
+  setSourceForegroundHwnd,
+  getSourceForegroundHwnd,
   snapshot,
   snapshotChatMessages,
   pushChatMessage,

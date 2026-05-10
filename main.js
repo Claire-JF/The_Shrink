@@ -1,6 +1,9 @@
 /**
  * Electron entry — delegates to Backend-1 (plumbing).
  */
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 const { app } = require('electron');
 const { initBackend1, disposeBackend1 } = require('./backend1');
 

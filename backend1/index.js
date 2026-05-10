@@ -8,17 +8,16 @@ const brain = require('./brain');
 const windowMod = require('./window');
 const hotkey = require('./hotkey');
 const { registerIpc, runCaptureFlow } = require('./ipc');
-const mockPlaceholderShell = require('./mock-placeholder-shell');
 
-function sendCaptureWhenReady(win, result) {
+/**
+ * Deliver renderer payload once webContents can receive IPC, then reveal the hover window.
+ */
+function presentWhenReady(win, envelope) {
   const send = () => {
     if (!win.isDestroyed()) {
-      win.webContents.send('shrink:presentation', {
-        type: 'capture',
-        payload: result,
-      });
+      win.webContents.send('shrink:presentation', envelope);
+      windowMod.showWindow();
     }
-    windowMod.showWindow();
   };
 
   if (win.webContents.isLoading()) {
@@ -36,6 +35,10 @@ async function onShrinkHotkey(forced) {
   }
   if (!win || win.isDestroyed()) return;
 
+  /**
+   * Run capture + score BEFORE showing the hover window so the foreground app
+   * keeps focus for UI Automation / Ctrl+C selection (Electron must not activate first).
+   */
   let result;
   try {
     result = await runCaptureFlow({ forced });
@@ -55,7 +58,7 @@ async function onShrinkHotkey(forced) {
     return;
   }
 
-  sendCaptureWhenReady(win, result);
+  presentWhenReady(win, { type: 'capture', payload: result });
 }
 
 async function initBackend1() {
@@ -77,10 +80,6 @@ async function initBackend1() {
         });
       }
     },
-    onOpenWorkbench: () => {
-      mockPlaceholderShell.toggleOrFocusMockUi();
-      logger.info('mock placeholders shown');
-    },
   });
 
   logger.info('Backend-1 initialized', {
@@ -91,7 +90,6 @@ async function initBackend1() {
 
 function disposeBackend1() {
   hotkey.unregister();
-  mockPlaceholderShell.destroyMockShell();
   windowMod.destroyWindow();
 }
 

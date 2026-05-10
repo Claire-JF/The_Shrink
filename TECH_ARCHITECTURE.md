@@ -1,5 +1,7 @@
 # The Shrink — Technical Architecture & Division of Labor
 
+> **Living implementation map:** **[AGENT_CONTEXT.md](AGENT_CONTEXT.md)** — includes Windows **UI Automation** selection (fallback **Ctrl+C**), **protected-region optimize**, removal of the old **Ctrl+Shift+W** dual-shell from the main process, and current IPC. When this file disagrees with **AGENT_CONTEXT** / **INTEGRATION_CONTRACT**, trust those.
+
 > **Hackathon:** Cursor Hackathon Vancouver, May 10, 2026
 > **Repo:** https://github.com/Claire-JF/The_Shrink
 > **Submission cutoff:** 18:00 (hard, no exceptions)

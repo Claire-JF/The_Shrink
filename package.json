@@ -1,15 +1,19 @@
 {
   "name": "the-shrink",
   "version": "0.1.0",
-  "description": "The Shrink — Backend-1 plumbing skeleton (Windows-first)",
+  "description": "The Shrink — Electron desktop + Backend-2 (Windows-first)",
   "main": "main.js",
   "private": true,
   "dependencies": {
-    "openai": "^4.77.0"
+    "dotenv": "^16.4.7",
+    "openai": "^4.86.2"
   },
   "scripts": {
     "start": "electron .",
-    "verify": "node scripts/verify-backend1.js"
+    "verify": "node scripts/verify-backend1.js",
+    "test:stability": "node tests/stability-test.js",
+    "test:quick": "node tests/stability-test.js --runs=3",
+    "test:mock": "node tests/verify-mock.js"
   },
   "devDependencies": {
     "electron": "^33.4.1"

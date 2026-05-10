@@ -9,34 +9,24 @@ const selection = require('./selection');
 const config = require('./config');
 const brain = require('./brain');
 const windowMod = require('./window');
-const mockPlaceholderShell = require('./mock-placeholder-shell');
+const { readForegroundHWND, pasteIntoHWND } = require('./win-foreground-hwnd');
 const CHANNEL = {
   CAPTURE: 'shrink:capture-selection',
   GENERATE: 'shrink:generate-optimized',
   COPY: 'shrink:copy-to-clipboard',
+  REPLACE: 'shrink:replace-with-optimized',
   CLOSE: 'shrink:close-widget',
   GET_STATE: 'shrink:get-state',
   GET_CONFIG: 'shrink:get-config',
   OPEN_LOG: 'shrink:open-log',
   SCORE_LIVE: 'shrink:score-live',
   CHAT_SEND: 'shrink:chat-send',
-  MOCK_BAR_RESIZE: 'mock-ui:resize-bar',
-  MOCK_DISMISS: 'mock-ui:dismiss-shell',
   FORWARD_PROMPT: 'shrink:forward-prompt',
   FORWARD_PREFS_GET: 'shrink:forward-prefs-get',
   FORWARD_PREFS_SET: 'shrink:forward-prefs-set',
 };
 
 let handlersBound = false;
-let mockTelemetryWired = false;
-
-function wireMockUiTelemetry() {
-  if (mockTelemetryWired) return;
-  mockTelemetryWired = true;
-  ipcMain.on('mock-ui:telemetry', (_e, payload) => {
-    mockPlaceholderShell.broadcastOrb(payload ?? {});
-  });
-}
 
 function shouldOpenWidget(scoreTotal) {
   const demo = config.get('demoMode');
@@ -50,6 +40,9 @@ async function runCaptureFlow({ forced }) {
   const text = cap.text || '';
   state.setSelection(text);
 
+  const hwnd = await readForegroundHWND();
+  state.setSourceForegroundHwnd(hwnd);
+
   let scoreResult;
   try {
     scoreResult = await brain.score(text);
@@ -62,12 +55,15 @@ async function runCaptureFlow({ forced }) {
   state.setOptimized(null);
 
   const total = scoreResult && scoreResult.total != null ? scoreResult.total : null;
-  const open = forced || shouldOpenWidget(total);
+  // Always show the hover UI after capture: high-scoring prompts used to suppress the window
+  // and felt like Ctrl+R did nothing. Threshold/demo flags still drive the DEMO badge only.
+  const open = true;
 
   logger.info('capture-selection done', {
     textLength: text.length,
     total,
     open,
+    meetsExpandThreshold: shouldOpenWidget(total),
     forced,
     demoMode: config.get('demoMode'),
   });
@@ -82,7 +78,6 @@ async function runCaptureFlow({ forced }) {
 
 function registerIpc() {
   if (handlersBound) return;
-  wireMockUiTelemetry();
 
   ipcMain.handle(CHANNEL.CAPTURE, async (_e, payload) => {
     const forced = !!(payload && payload.forced);
@@ -101,11 +96,17 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle(CHANNEL.GENERATE, async () => {
+  ipcMain.handle(CHANNEL.GENERATE, async (_e, payload) => {
     const text = state.getSelection();
     const scoreResult = state.getScore();
-    logger.info('IPC generate-optimized', { textLength: text.length });
-    const optimized = await brain.optimize(text, scoreResult);
+    const protectedRegions = Array.isArray(payload?.protectedRegions)
+      ? payload.protectedRegions
+      : [];
+    logger.info('IPC generate-optimized', {
+      textLength: text.length,
+      protectedRegions: protectedRegions.length,
+    });
+    const optimized = await brain.optimize(text, scoreResult, { protectedRegions });
     state.setOptimized(optimized);
     return optimized;
   });
@@ -117,6 +118,37 @@ function registerIpc() {
     logger.info('IPC copy-to-clipboard', { length: String(text ?? '').length });
     await clipboard.writeOptimized(text ?? '');
     return { ok: true };
+  });
+
+  ipcMain.handle(CHANNEL.REPLACE, async () => {
+    const opt = state.getOptimized();
+    const body =
+      opt && typeof opt === 'object'
+        ? opt.optimizedText ?? opt.optimized_text ?? ''
+        : '';
+    const t = String(body ?? '');
+    if (!t.trim()) {
+      logger.warn('IPC replace-with-optimized: no optimized text');
+      return { ok: false, reason: 'no_optimized', clipboard: false, pasted: false };
+    }
+    logger.info('IPC replace-with-optimized', { length: t.length });
+    await clipboard.writeOptimized(t);
+    const hwnd = state.getSourceForegroundHwnd();
+    let pasted = false;
+    if (process.platform === 'win32' && hwnd) {
+      const r = pasteIntoHWND(hwnd);
+      pasted = !!r.pasted;
+      if (!pasted) {
+        logger.warn('IPC replace-with-optimized: paste failed', r);
+      }
+    }
+    windowMod.hideWindow();
+    return {
+      ok: true,
+      clipboard: true,
+      pasted,
+      pasteAttempted: process.platform === 'win32' && !!hwnd,
+    };
   });
 
   ipcMain.handle(CHANNEL.CLOSE, () => {
@@ -159,22 +191,6 @@ function registerIpc() {
     const text = typeof payload?.text === 'string' ? payload.text : '';
     logger.info('IPC chat-send', { length: text.length });
     return brain.sendChatTurn(text);
-  });
-
-  ipcMain.handle(CHANNEL.MOCK_BAR_RESIZE, (_e, payload) => {
-    const h =
-      typeof payload?.heightPx === 'number'
-        ? payload.heightPx
-        : Number(payload?.heightPx ?? 0);
-    if (h > 0) {
-      mockPlaceholderShell.resizeInputBar(h);
-    }
-    return { ok: true };
-  });
-
-  ipcMain.handle(CHANNEL.MOCK_DISMISS, () => {
-    mockPlaceholderShell.dismissMockUi();
-    return { ok: true };
   });
 
   ipcMain.handle(CHANNEL.FORWARD_PROMPT, (_e, payload) => {

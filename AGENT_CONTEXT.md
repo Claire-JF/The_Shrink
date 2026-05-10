@@ -2,17 +2,19 @@
 
 > **Audience:** Humans or downstream agents picking up implementation. Read this **before** trusting older narrative-only docs verbatim.
 >
-> **Last aligned with codebase:** Electron + Backend-2 ESM bridge + dual mock shell + Windows forward path (see git history).
+> **Last aligned with codebase:** Electron hover widget + Windows UI Automation selection (with clipboard fallback) + protected-region optimize + `main.js` loads `.env` from repo root.
 
 ## One-liners
 
 | Surface | Purpose |
 |---------|---------|
-| **Hover widget** | Global capture + score pipeline (original product loop). User selects text elsewhere, presses hotkey → widget opens. |
-| **Mock dual shell (`Ctrl+Shift+W`)** | Product experiment: Claude-style bottom **input strip** + top-right translucent **orb**; optional **live scoring** inside the strip; **Send** forwards to external apps + triggers in-app assistant chat. |
-| **Backend-2 (`src/`)** | Pure ESM JS: `score` / `optimize` / `warmup` / **`chat`** + OpenAI-compat `createClient` + in-process **`createMockClient`**. Loaded from main via **`backend1/brain.js`** dynamic `import()`. |
+| **Hover widget** | Global capture + score pipeline. User selects text elsewhere, presses **Ctrl+R** → selection is read → Backend-2 **`score`** → widget shows; user may mark **protected spans** in the original column before **Generate** → **`optimize`** with `{ protectedRegions }`. |
+| **Replace selection** | After Generate, pastes optimized text into the app that had focus at capture time (Windows: HWND + Ctrl+V; else clipboard + close). |
+| **Backend-2 (`src/`)** | Pure ESM JS: **`score`** / **`optimize`**, optional **`{ protectedRegions }`**, **`warmup`** / **`chat`**, OpenAI-compat **`createClient`** + **`createMockClient`**. Loaded via **`backend1/brain.js`** dynamic `import()`. |
 
 **No standalone HTTP backend server.** All LLM traffic is Electron main → CLōD (or Mock).
+
+**Legacy / unused in main flow:** `renderer/mock-*.html` (old dual-shell experiment) is not registered by the main process; IPC channels for that shell were removed.
 
 ---
 
@@ -24,7 +26,8 @@ npm start
 ```
 
 - **`npm run verify`** — short smoke (sets `VERIFY_BACKEND1` / `MOCK_SELECTION`).
-- **Env vars:** see `.env.example` — notably `CLOD_API_KEY`, `LLM_*`, optional `LLM_CHAT_MODEL`, `MOCK_SELECTION`, `DEMO_MODE`.
+- **`npm run test:mock`** / **`npm run test:quick`** — Backend-2 unit-style checks (see `package.json`).
+- **Env vars:** see **`.env.example`** — `CLOD_API_KEY`, `LLM_*`, optional `LLM_CHAT_MODEL`, `MOCK_SELECTION`, `DEMO_MODE`, **`DISABLE_UIA_SELECTION`**, `SCORE_EXPAND_THRESHOLD`, etc. Electron loads **`.env`** from the directory containing **`main.js`** (`require('dotenv').config({ path: path.join(__dirname, '.env') })`).
 
 ---
 
@@ -32,70 +35,94 @@ npm start
 
 | Accelerator | Behavior |
 |-------------|-----------|
-| **Ctrl+R** (`CommandOrControl+R`) | Shrink hover widget: capture selection → score (Backend-2) → show if thresholds allow |
-| **Ctrl+Shift+S** (+ Windows fallbacks if busy) | Forced pipeline (threshold bypass) |
-| **Ctrl+Shift+D** | Toggle demo-mode (always expand thresholds) |
-| **Ctrl+Shift+W** | Open **dual mock UI**: bottom input strip + orb (360-style) |
+| **Ctrl+R** (`CommandOrControl+R`) | Primary shrink trigger — run capture + score → show hover widget (see **focus order** below). |
+| **Ctrl+Alt+R** / **Ctrl+Shift+R** (Windows fallbacks) | Same as shrink if the first binding failed to register (another app seized **Ctrl+R**). |
+| **Ctrl+Shift+S** (+ extra fallbacks on Windows) | Forced pipeline (threshold bypass). |
+| **Ctrl+Shift+D** | Toggle demo mode (DEMO badge; threshold gating still computed for logging). |
 
-> **Historical doc drift:** Older specs say **Cmd+T**. Team aligned globally on **`Ctrl+R`** for shrink trigger (same `CommandOrControl` semantics on macOS).
+> **Historical doc drift:** Older specs say **Cmd+T**. Team aligned on **`Ctrl+R`** / **`CommandOrControl+R`** (macOS uses Cmd).
+
+**Focus / timing:** The main process runs **`runCaptureFlow` (selection + score) before the first `showWindow`** so the **foreground app keeps focus** for selection read (UI Automation or Ctrl+C). Do not reintroduce “show loading widget before capture” without revisiting this.
+
+---
+
+## Selection capture (Windows)
+
+Implemented in **`backend1/selection.js`**:
+
+1. **UI Automation (preferred):** **`scripts/win-selection-uia.ps1`** uses **`TextPattern.GetSelection()`** on **`AutomationElement.FocusedElement`** — **no clipboard mutation**. Returns UTF-8 via Base64 on stdout.
+2. **Fallback:** Classic flow — snapshot clipboard → PowerShell **SendKeys `^c`** → read clipboard → restore (**`sourceApp: 'clipboard-copy'`**).
+3. **`MOCK_SELECTION=1`** or config **`mockSelection`**: stub text, no OS calls.
+
+Set **`DISABLE_UIA_SELECTION=1`** in `.env` to skip UIA and always use the clipboard copy path (debugging / app compatibility).
+
+**Non-Windows:** real capture is not wired; use **`MOCK_SELECTION=1`** or expect **`PLATFORM_UNSUPPORTED`**.
+
+**Limitations:** UIA works when the focused control exposes **TextPattern** (many editors, browsers). Terminals, some games, and non-accessible UIs often return empty → automatic clipboard fallback.
+
+---
+
+## Protected regions (optimize)
+
+- **Frontend:** User drag-selects **verbatim keep** spans on the Original panel; offsets are sent as **`protectedRegions: [{ start, end }]`** (UTF-16 indices, half-open) with **`shrink:generate-optimized`**.
+- **Backend-2:** **`optimize(text, scoreResult, client, config, { protectedRegions })`**. Prompts use **`<<PROTECTED>>…<</PROTECTED>>`** markers; output is stripped of stray markers; **`safety < 2.0`** forces **safety override** (ignore protections) in code. See **`temp/PROTECTED_REGIONS_SPEC.md`** for narrative detail.
 
 ---
 
 ## Directory map (truth)
 
 ```
-main.js                     # Electron entry, single-instance
-preload.js                  # contextBridge → window.shrink, window.mockShell
+main.js                     # Electron entry; require('dotenv').config({ path: join(__dirname, '.env') })
+preload.js                  # contextBridge → window.shrink
 backend1/
-  index.js                  # init: logger → brain.initBrain → ipc → shortcuts
-  window.js / hotkey.js     # Hover BrowserWindow + globalShortcut
-  selection.js             # WIN32: clipboard save → PowerShell SendKeys ^c → restore
-  ipc.js                   # ipcMain handlers (see table below)
-  brain.js                  # Dynamic import Backend-2; client factory
+  index.js                  # init; hotkeys — runCaptureFlow BEFORE first show (focus-safe)
+  window.js / hotkey.js     # Hover BrowserWindow + globalShortcut (+ Windows shrink fallbacks)
+  selection.js              # Win: UIA selection → else clipboard ^c snapshot
+  ipc.js                    # ipcMain handlers
+  brain.js                  # Dynamic import Backend-2; optimize options passthrough
+  win-foreground-hwnd.js    # HWND snapshot + paste helper (Replace)
   clipboard.js config.js logger.js state.js
-  mock-placeholder-shell.js # Dual windows coordinator
   prefs.js                  # `%AppData%/the-shrink/shrink-ui-prefs.json`
-  forward-prompt.js       # Clipboard + optional Windows foreground + paste bridge
+  forward-prompt.js         # Clipboard + optional Windows foreground + paste bridge
 renderer/
-  index.html app.js styles.css       # Hover widget UI
-  mock-input-bar.* mock-orb.*
-  live-heuristic.js mock-live-debounce.js
+  index.html app.js styles.css
 scripts/
-  win-forward-paste.ps1             # Activate host process + Ctrl+V best-effort
+  win-selection-uia.ps1     # UI Automation TextPattern selection (no clipboard)
+  win-paste-foreground.ps1  # Activate HWND + ^v (Replace)
+  win-forward-paste.ps1     # Forward prompt to external app
 src/
-  package.json            # { "type": "module" } — subdirectory ESM boundary
-  index.js                # score, optimize, warmup, chat, re-exports client factories
+  index.js                  # score, optimize, warmup, chat, re-exports
+  protected-regions.js      # normalize regions, safety threshold, reconcile spans, strip markers
+  optimizer.js prompts/ schema.js …
   llm/client.js mock-client.js
 ```
-
-Legacy flat names in **SPEC_CLIPBOARD.md** / **TECH_ARCHITECTURE.md** (`main.js` only roots, separate `selection.js`) were **planned layout** — code is **`backend1/*` + grouped renderer assets**.
 
 ---
 
 ## IPC & preload APIs (minimal contract)
 
-Preload exposes **`window.shrink`**:
+Preload exposes **`window.shrink`** (see **`preload.js`** / **`backend1/ipc.js`** `CHANNEL`):
 
-| Invoke / pattern | Payload / behavior |
-|------------------|-------------------|
-| `shrink:capture-selection` | `{ forced? }` — selection + Backend-2 score |
-| `shrink:generate-optimized` | state-driven optimize |
+| Invoke | Payload / behavior |
+|--------|---------------------|
+| `shrink:capture-selection` | `{ forced? }` — selection + Backend-2 **`score`** |
+| `shrink:generate-optimized` | **`{ protectedRegions?: { start, end }[] }`** — **`optimize`** with optional regions |
 | `shrink:copy-to-clipboard` | `{ text? }` |
-| `shrink:score-live` | `{ text }` — live/workbench strip scoring |
-| `shrink:chat-send` | `{ text }` — append user + assistant in `state`, call Backend-2 **`chat`** |
-| `shrink:forward-prompt` | merges UI prefs (`forwardTarget`) + pushes clipboard + PS paste bridge |
-| `shrink:getForwardPrefs` / `setForwardPrefs` | Persist forward target dropdown |
-| `mock-ui:*` sizing / dismiss via **`window.mockShell`** | telemetry fan-out to orb, bar resize |
+| `shrink:replace-with-optimized` | Clipboard + optional Windows paste + hide widget |
+| `shrink:close-widget` | Hide hover |
+| `shrink:get-state` / `get-config` | Session / config |
+| `shrink:open-log` | Open log file |
+| `shrink:score-live` | `{ text }` — ad hoc **`score`** |
+| `shrink:chat-send` | `{ text }` — **`chat`** turn |
+| `shrink:forward-prompt` / forward prefs | External paste bridge |
 
-Main also listens **`ipcMain.on('mock-ui:telemetry')`** → orb Broadcast.
-
-Complete list maintained in **`backend1/ipc.js`** `CHANNEL`.
+`shrink:presentation` (main → renderer) carries **`loading`**, **`capture`**, **`config`** payloads.
 
 ---
 
-## Scoring shapes (⚠ divergence from SPEC narrative)
+## Scoring shapes
 
-Implementation follows **[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md)** (Backend-2 handoff):
+Implementation follows **[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md)**:
 
 | Field | Meaning |
 |-------|---------|
@@ -103,18 +130,15 @@ Implementation follows **[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md)** (B
 | `total` | Mean of dimensions |
 | `summary` | One-line rationale |
 
-Older **SPEC_CLIPBOARD.md** / **TECH_ARCHITECTURE.md** sections describe **`task_verb`/`scope`/…/`flags`** (0–1 scale) — that is **not** what the wired UI + Backend-2 entry returns today. When reconciling demos, prioritize **INTEGRATION_CONTRACT** + **renderer UI** rendering code.
-
-Optimized JSON in live code: **`optimizedText` + `changes[]`** (`camelCase`); legacy **`optimized_text`** tolerated for Copy path.
+Optimized payload includes **`optimizedText`**, **`changes[]`**, optional **`safetyOverride`**, **`protectedRegions`** (see contract).
 
 ---
 
-## Forward-to-external-AI (“one tap after Send”)
+## Forward-to-external-AI
 
-- **Windows-only automation:** `scripts/win-forward-paste.ps1` activates process main window (`Cursor`, `Claude`, …) → `Ctrl+V`.
-- Fallback is **always clipboard** — safe cross-platform semantics.
-- **Custom** preset: PowerShell resolves arbitrary **`.exe`-less process base name**.
-- Targets list + heuristic process map live in **`forward-prompt.js`** + **`win-forward-paste.ps1`** — update both if rebranding installers rename EXEs.
+- **Windows:** `scripts/win-forward-paste.ps1` — activate host + **Ctrl+V**.
+- **Fallback:** clipboard only off-Windows.
+- Code: **`forward-prompt.js`**.
 
 ---
 
@@ -123,15 +147,8 @@ Optimized JSON in live code: **`optimizedText` + `changes[]`** (`camelCase`); le
 ```text
 brain.js ──(import)──► src/index.js
                 ├► createClient(llmConfig) vs createMockClient() if no CLOD_API_KEY
-                └► score(text) | optimize(sel,score) | chat(history) | warmup
+                └► score(text) | optimize(text, score, { protectedRegions? }) | chat | warmup
 ```
-
-Warmup executes even for mocks (cheap path). Conversation model defaults to **`LLM_CHAT_MODEL`** or **`LLM_DEEP_MODEL`**.
-
-When extending Backend-2:
-
-- Preserve **never-throw guarantee** documented in Integration Contract OR align error surfacing consciously.
-- If adding streaming, coordinate UI + IPC buffering (not implemented).
 
 ---
 
@@ -139,12 +156,10 @@ When extending Backend-2:
 
 | Item | Notes |
 |------|------|
-| **macOS/Linux forward bridge** | Only clipboard copied today off-Windows |
-| **`robotjs`/AppleScript** | Not wired in this branch — Windows-only capture path deliberate |
-| **Score dimension reconciliation** | Marketing SPEC vs Backend-2 contract intentional drift — pick canonical before tournament story |
-| **Nia integration** | Spec P1 checkpoint — untouched in scaffolding |
-| **Streaming chat** | `chat()` is single completion |
-| **Security review** | PowerShell elevate / wrong-window paste risk — UX warning recommended |
+| **macOS/Linux selection** | No UIA path; use **`MOCK_SELECTION=1`** or add native capture later |
+| **UI Automation coverage** | Some apps never expose **TextPattern** → clipboard fallback |
+| **Nia / streaming** | Not in current branch |
+| **Security** | PowerShell paste / wrong-window risk — UX caution |
 
 ---
 
@@ -152,17 +167,17 @@ When extending Backend-2:
 
 | File | Weight |
 |------|--------|
-| **AGENT_CONTEXT.md** (this) | Executable truth for codebase navigation |
+| **AGENT_CONTEXT.md** (this) | Executable truth for navigation |
 | **INTEGRATION_CONTRACT.md** | Backend-2 API + JSON envelopes |
-| **SPEC_CLIPBOARD.md** | Narrative UX + demos + historical dimension names ❗ outdated on schema |
-| **TECH_ARCHITECTURE.md** | Original division-of-labor + risks — partially superseded architecture notes |
-| **task_for_backend.txt** | Early Backend-1/2 split memo — overlaps with AGENT_CONTEXT |
+| **temp/PROTECTED_REGIONS_SPEC.md** | Protected regions narrative |
+| **SPEC_CLIPBOARD.md** / **TECH_ARCHITECTURE.md** | Historical — verify against this file + code |
+| **README.md** | Quick start + doc links |
 
 ---
 
 ## Handoff checklist for a new coding agent
 
 1. Read **`AGENT_CONTEXT.md`** + **`INTEGRATION_CONTRACT.md`**.
-2. Run **`npm install`**, **`npm start`**, **`Ctrl+Shift+W`** inspect dual UI & **`npm run verify`** baseline.
-3. Trace one IPC path in **`preload.js`** → **`ipc.js`** → **`brain.js`** → **`src/index.js`**.
-4. Before flipping schema in docs, grep **`renderer/`** & **`ipc.js`** consumers.
+2. Run **`npm install`**, **`npm run verify`**, optional **`npm run test:mock`**.
+3. Trace **`preload.js`** → **`ipc.js`** → **`brain.js`** → **`src/index.js`**.
+4. Before changing optimize/score shapes, grep **`renderer/`**, **`ipc.js`**, **`tests/`**.

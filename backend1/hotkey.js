@@ -35,12 +35,16 @@ function registerFirstWorking(label, accelerators, fn) {
  * @param {() => void | Promise<void>} handlers.onShrinkTrigger  Cmd/Ctrl+R
  * @param {() => void | Promise<void>} handlers.onForcedTrigger   Cmd/Ctrl+Shift+S (fallbacks on Windows if busy)
  * @param {() => void | Promise<void>} handlers.onDemoToggle      Cmd/Ctrl+Shift+D
- * @param {() => void | Promise<void>} [handlers.onOpenWorkbench] Ctrl+Shift+W — dual mock UI shell
  */
 function register(handlers) {
   if (registered) return;
 
-  registerFirstWorking('shrink', ['CommandOrControl+R'], handlers.onShrinkTrigger);
+  // Ctrl+R / Cmd+R is often taken by GPU overlays, IME, VMs, IDE globals, etc. Try fallbacks on Windows.
+  const shrinkChain =
+    process.platform === 'win32'
+      ? ['CommandOrControl+R', 'Control+Alt+R', 'CommandOrControl+Shift+R']
+      : ['CommandOrControl+R'];
+  registerFirstWorking('shrink', shrinkChain, handlers.onShrinkTrigger);
 
   const forcedChain =
     process.platform === 'win32'
@@ -53,14 +57,6 @@ function register(handlers) {
   registerFirstWorking('forced', forcedChain, handlers.onForcedTrigger);
 
   registerFirstWorking('demo-toggle', ['CommandOrControl+Shift+D'], handlers.onDemoToggle);
-
-  if (handlers.onOpenWorkbench) {
-    registerFirstWorking(
-      'mock-ui-shell',
-      ['CommandOrControl+Shift+W'],
-      handlers.onOpenWorkbench
-    );
-  }
 
   registered = true;
 }
