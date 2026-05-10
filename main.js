@@ -1,6 +1,8 @@
 /**
  * Electron entry — delegates to Backend-1 (plumbing).
  */
+require('dotenv').config();
+
 const { app } = require('electron');
 const { initBackend1, disposeBackend1 } = require('./backend1');
 
