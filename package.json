@@ -1,0 +1,20 @@
+{
+  "name": "the-shrink",
+  "version": "0.1.0",
+  "description": "The Shrink — Backend-1 plumbing skeleton (Windows-first)",
+  "main": "main.js",
+  "private": true,
+  "dependencies": {
+    "openai": "^4.77.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "verify": "node scripts/verify-backend1.js"
+  },
+  "devDependencies": {
+    "electron": "^33.4.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
+    <title>Shrink — Input Strip</title>
+    <link rel="stylesheet" href="./mock-input-bar.css" />
+  </head>
+  <body>
+    <div class="strip" id="strip">
+      <div class="fwd-toolbar">
+        <label class="fwd-lab" for="forwardTarget">转发到</label>
+        <select id="forwardTarget" class="fwd-select" title="发送到外部宿主（Windows 会自动尝试置顶 + 粘贴）">
+          <option value="clipboard">仅剪贴板</option>
+          <option value="cursor">Cursor</option>
+          <option value="codex">Codex</option>
+          <option value="claude">Claude Desktop</option>
+          <option value="vscode">VS Code</option>
+          <option value="windsurf">Windsurf</option>
+          <option value="custom">自定义进程名…</option>
+        </select>
+        <input
+          type="text"
+          id="customProc"
+          class="fwd-custom hidden"
+          placeholder="进程前缀，如 Claude（不要带 .exe）"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+      <div class="row">
+        <textarea
+          id="composer"
+          rows="2"
+          placeholder="像在 Claude Desktop 底部条那样输入……"
+          spellcheck="true"
+        ></textarea>
+        <button type="button" id="sendBtn" class="send">发送</button>
+      </div>
+      <section id="replyPanel" class="reply hidden">
+        <div class="reply-hdr">Assistant</div>
+        <pre id="replyBody" class="reply-body"></pre>
+      </section>
+      <div class="foot">
+        <span id="statusLine">本地预览就绪</span>
+        <button type="button" id="collapseBtn" class="link-btn hidden">收起回复</button>
+      </div>
+    </div>
+    <script src="./live-heuristic.js"></script>
+    <script src="./mock-live-debounce.js"></script>
+    <script src="./mock-input-bar.js"></script>
+  </body>
+</html>

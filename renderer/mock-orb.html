@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
+    <title>Shrink Orb</title>
+    <link rel="stylesheet" href="./mock-orb.css" />
+  </head>
+  <body>
+    <div class="orb-shell" id="orbRoot">
+      <div class="halo"></div>
+      <div class="core">
+        <div id="scoreReadout" class="score">–</div>
+        <div id="summaryReadout" class="hint">占位悬浮球 · 右上角</div>
+        <div id="stateChip" class="chip idle">待机</div>
+      </div>
+    </div>
+    <script src="./mock-orb.js"></script>
+  </body>
+</html>

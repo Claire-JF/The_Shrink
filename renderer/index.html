@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Shrink</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="hdr">
+      <div class="hdr-left">
+        <span id="scoreLabel">Score — / 5.0</span>
+        <span id="demoBadge" class="badge hidden">DEMO</span>
+      </div>
+      <button type="button" id="btnClose" class="icon-btn" aria-label="Close">✕</button>
+    </header>
+
+    <main class="grid">
+      <section class="col">
+        <h2>Original</h2>
+        <pre id="original" class="box">—</pre>
+      </section>
+      <section class="col">
+        <h2 id="rightTitle">Issues</h2>
+        <ul id="flags" class="flags"></ul>
+        <ul id="changes" class="changes hidden"></ul>
+        <pre id="optimized" class="box hidden">—</pre>
+        <div class="actions">
+          <button type="button" id="btnGenerate" class="pill">Generate</button>
+          <button type="button" id="btnCopy" class="pill secondary hidden">Copy</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="ft">
+      <span id="hint"><span id="llmBadge" class="badge llm-mock">MOCK LLM</span> · Ctrl+R ·条+球 Ctrl+Shift+W · Ctrl+Shift+D · Esc</span>
+      <button type="button" id="btnLog" class="linkish">Open log</button>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
