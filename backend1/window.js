@@ -88,6 +88,19 @@ function showWindow() {
   mainWindow.focus();
 }
 
+/**
+ * Show without activating — keeps the previous app foreground for UI Automation / Ctrl+C
+ * while the hover shell is already visible (Windows + macOS).
+ */
+function showWindowInactive() {
+  if (!mainWindow) return;
+  if (typeof mainWindow.showInactive === 'function') {
+    mainWindow.showInactive();
+  } else {
+    mainWindow.show();
+  }
+}
+
 function hideWindow() {
   if (!mainWindow) return;
   mainWindow.hide();
@@ -103,6 +116,7 @@ module.exports = {
   getWindow,
   createWindow,
   showWindow,
+  showWindowInactive,
   hideWindow,
   destroyWindow,
 };

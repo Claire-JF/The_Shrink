@@ -257,6 +257,52 @@ function showLoadingState() {
   setBusyOverlay(true, 'Reading selection & scoring…');
 }
 
+/** Pop-up shown immediately on hotkey; host app still has focus while we read the selection. */
+function showCaptureAwaitingSelection() {
+  applySafetyBanner(false, '');
+  $('rightTitle').textContent = 'Score';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('changes').classList.add('hidden');
+  $('flags').classList.add('hidden');
+  sourcePlain = '';
+  userProtectedRegions = [];
+  const host = $('originalHost');
+  if (host) {
+    host.innerHTML = '';
+    appendTextFragment(host, '…');
+  }
+  setScore(null);
+  $('btnGenerate').disabled = true;
+  setBusyOverlay(true, 'Reading selection…');
+}
+
+/** After selection text is known, while the main process is still awaiting `score()`. */
+function showCaptureScoringPending(payload) {
+  applySafetyBanner(false, '');
+  $('rightTitle').textContent = 'Score';
+  $('optimized').classList.add('hidden');
+  $('btnCopy').classList.add('hidden');
+  $('btnReplace').classList.add('hidden');
+  $('changes').classList.add('hidden');
+  $('flags').classList.add('hidden');
+
+  let text = typeof payload?.capturedText === 'string' ? payload.capturedText : '';
+  if (payload.error) {
+    text = `(Error) ${payload.error}${text ? `\n${text}` : ''}`.trim();
+  }
+
+  sourcePlain = text || '';
+  userProtectedRegions = [];
+  $('originalHost').focus({ preventScroll: true });
+  renderOriginalHost();
+
+  setScore(null);
+  $('btnGenerate').disabled = true;
+  setBusyOverlay(true, 'Scoring…');
+}
+
 function showState1(payload) {
   setBusyOverlay(false);
   applySafetyBanner(false, '');
@@ -356,7 +402,15 @@ async function bootstrap() {
       showLoadingState();
     }
     if (msg.type === 'capture' && msg.payload) {
-      showState1(msg.payload);
+      if (msg.payload.loading) {
+        if (msg.payload.phase === 'selection') {
+          showCaptureAwaitingSelection();
+        } else {
+          showCaptureScoringPending(msg.payload);
+        }
+      } else {
+        showState1(msg.payload);
+      }
     }
     if (msg.type === 'config' && msg.payload) {
       $('demoBadge').classList.toggle('hidden', !msg.payload.demoMode);
