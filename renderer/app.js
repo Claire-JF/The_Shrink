@@ -593,6 +593,18 @@ function handleDocumentClick(event) {
 // pointermove on document — covers petal overflow area (mouseenter/leave on the
 // catWrap only covers the cat image, so document-level pointermove catches SVG overflow.
 function handlePointerMove(event) {
+  if (
+    originalFieldDragStart &&
+    (event.buttons & 1) === 1 &&
+    !elements.originalSection.classList.contains("is-hidden")
+  ) {
+    const dx = event.clientX - originalFieldDragStart.x;
+    const dy = event.clientY - originalFieldDragStart.y;
+    if (Math.hypot(dx, dy) > 6) {
+      originalFieldDragging = true;
+    }
+  }
+
   // When cursor is on the tip pill itself, don't dismiss — it's clickable
   if (event.target === elements.petalTip) return;
 
@@ -742,12 +754,15 @@ function wrapProtectedRange(range) {
     return true;
   } catch {
     try {
+      /* insertNode MUST come before filling span (collapse point after extract) */
       const frag = range.extractContents();
       if (!frag || !frag.textContent || !frag.textContent.trim()) {
         return false;
       }
-      span.appendChild(frag);
       range.insertNode(span);
+      while (frag.firstChild) {
+        span.appendChild(frag.firstChild);
+      }
       return true;
     } catch {
       return false;
@@ -762,21 +777,35 @@ function handleOriginalPointerDown(event) {
   originalFieldDragging = false;
 }
 
-function handleOriginalPointerMove(event) {
+/**
+ * Runs after pointer release — listens on document capture so releasing outside `.original-field`
+ * still preserves the user's text selection until we wrap it.
+ */
+function finalizeProtectFromSelection() {
   if (elements.originalSection.classList.contains("is-hidden")) return;
-  if (!originalFieldDragStart || (event.buttons & 1) !== 1) return;
-  const dx = event.clientX - originalFieldDragStart.x;
-  const dy = event.clientY - originalFieldDragStart.y;
-  if (Math.hypot(dx, dy) > 6) originalFieldDragging = true;
-}
 
-function handleOriginalMouseUp() {
   const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
-  if (!elements.originalField.contains(range.commonAncestorContainer)) return;
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    originalFieldDragStart = null;
+    originalFieldDragging = false;
+    return;
+  }
 
-  // Safety guard: if safety < 2, refuse to add protection
+  let range;
+  try {
+    range = sel.getRangeAt(0).cloneRange();
+  } catch {
+    originalFieldDragStart = null;
+    originalFieldDragging = false;
+    return;
+  }
+
+  const anc = range.commonAncestorContainer;
+  if (anc !== elements.originalField && !elements.originalField.contains(anc)) {
+    return;
+  }
+
+  /* Safety guard: if safety < 2, refuse to add protection */
   if (state.score && state.score.safety < 2.0) {
     sel.removeAllRanges();
     originalFieldDragging = false;
@@ -788,12 +817,18 @@ function handleOriginalMouseUp() {
   const ok = wrapProtectedRange(range);
   sel.removeAllRanges();
   originalFieldDragStart = null;
-  /*
-   * After surroundContents/extractWrap, Chromium dispatches click on/near the new span —
-   * our click handler must not unwrap immediately. Covers tiny drags as well (<6px pointer move).
-   */
   suppressNextProtectUnwrapClick = !!(ok && (originalFieldDragging || hadText));
   originalFieldDragging = false;
+}
+
+function scheduleFinalizeProtectPointerUp(event) {
+  if (event.button !== 0) return;
+  if (elements.originalSection.classList.contains("is-hidden")) return;
+  /*
+   * Let the browser finalize the Selection for this gesture before touching the DOM —
+   * needed when mouseup/target is outside `.original-field` (handled via capture).
+   */
+  queueMicrotask(() => finalizeProtectFromSelection());
 }
 
 function handleOriginalClick(event) {
@@ -801,6 +836,9 @@ function handleOriginalClick(event) {
     suppressNextProtectUnwrapClick = false;
     event.preventDefault();
     event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
     return;
   }
   const span = event.target.closest(".protected-span");
@@ -1153,13 +1191,17 @@ function init() {
   elements.petBubble.addEventListener("click", openPanel);
   elements.petalTip.addEventListener("click", () => { hidePetalTip(); openPanel(); });
   elements.originalField.addEventListener("pointerdown", handleOriginalPointerDown);
-  elements.originalField.addEventListener("pointermove", handleOriginalPointerMove);
-  elements.originalField.addEventListener("mouseup", handleOriginalMouseUp);
   elements.originalField.addEventListener(
     "click",
     handleOriginalClick,
     { capture: true },
   );
+  /*
+   * Global capture release: selections often finish with pointer/jButton up OUTSIDE `.original-field`
+   * (narrow scroll viewport), which never fired the old element-only mouseup listener.
+   */
+  document.addEventListener("pointerup", scheduleFinalizeProtectPointerUp, true);
+  document.addEventListener("mouseup", scheduleFinalizeProtectPointerUp, true);
   elements.catWrap.addEventListener("pointerdown", handleCatPointerDown);
   elements.catWrap.addEventListener("pointermove", handleCatPointerMove);
   elements.catWrap.addEventListener("pointerup", handleCatPointerUp);
