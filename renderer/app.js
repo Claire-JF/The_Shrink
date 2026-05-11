@@ -200,6 +200,10 @@ function setMode(mode) {
     resetBubbleTimer();
   }
   scheduleSyncOrbWindow();
+  /* Panel layout settles after two frames — remeasure so the OS window fits full chrome */
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => scheduleSyncOrbWindow());
+  });
 }
 
 function setPhase(phase) {
