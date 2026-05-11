@@ -65,9 +65,9 @@ function syncOrbContentSize(contentWidth, contentHeight, options = {}) {
   if (!win || win.isDestroyed()) return;
 
   const pad = 16;
-  /* Never shrink below orb + bubble (cat PNG is 112px). */
-  const w = Math.max(240, Math.ceil(Number(contentWidth) + pad));
-  const h = Math.max(148, Math.ceil(Number(contentHeight) + pad));
+  /* Never shrink below orb + large petal hover cushion (see body.mode-cat .shell padding). */
+  const w = Math.max(420, Math.ceil(Number(contentWidth) + pad));
+  const h = Math.max(380, Math.ceil(Number(contentHeight) + pad));
 
   const b = win.getBounds();
   let x;
@@ -130,9 +130,9 @@ function createWindow() {
 
   const transparent = useTransparentBrowserWindow();
 
-  /* Start tight — renderer ResizeObserver expands after first layout (orb-only size). */
-  const width = 280;
-  const height = 176;
+  /* Start roomy enough for petal hover (shell padding); ResizeObserver tightens after layout. */
+  const width = 520;
+  const height = 440;
   const initial = getTopRightBounds(width, height);
 
   mainWindow = new BrowserWindow({

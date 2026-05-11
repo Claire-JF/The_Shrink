@@ -78,11 +78,14 @@ button {
 body.mode-cat .shell {
   width: max-content;
   /* Avoid 100vw — it tracks BrowserWindow size and causes resize ↔ sync jitter */
-  max-width: 360px;
-  min-width: 240px;
-  min-height: calc(var(--cat-size) + 20px);
-  /* Extra reserve — radial petals + labels extend ~113–130px from cat centre */
-  padding: 14px 14px 178px 182px;
+  max-width: 420px;
+  min-width: 280px;
+  min-height: calc(var(--cat-size) + 32px);
+  /*
+   * Large cushion for hover petals: SVG arcs ~113px from centre, text labels, scale-in animation,
+   * and OS compositor clipping — bias extra space left + bottom (fan opens toward lower-left).
+   */
+  padding: 20px 20px 300px 300px;
   box-sizing: border-box;
 }
 
