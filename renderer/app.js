@@ -317,56 +317,8 @@ function clamp(value, min, max) {
 }
 
 let syncOrbTimer = null;
-/** Avoid ResizeObserver ↔ setBounds feedback jitter */
+/** Avoid ResizeObserver ↔ setBounds feedback jitter (only sync on meaningful layout deltas) */
 let lastOrbDimensions = { w: 0, h: 0 };
-let hoverBoundsTimer = null;
-
-/**
- * Petals / bubble / petal-tip paint outside #shell's layout box; offsetWidth/Height miss that.
- * Measure viewport union vs shell rect and return extra pixels needed on each side (text-length aware).
- */
-function measureCatHoverOverflowExtra() {
-  if (state.mode !== "cat") return { extraW: 0, extraH: 0 };
-
-  const shell = elements.shell;
-  const sr = shell.getBoundingClientRect();
-  let minX = sr.left;
-  let maxX = sr.right;
-  let minY = sr.top;
-  let maxY = sr.bottom;
-
-  const consider = (node) => {
-    if (!node) return;
-    const r = node.getBoundingClientRect();
-    if (r.width < 2 && r.height < 2) return;
-    minX = Math.min(minX, r.left);
-    maxX = Math.max(maxX, r.right);
-    minY = Math.min(minY, r.top);
-    maxY = Math.max(maxY, r.bottom);
-  };
-
-  if (elements.scoreHover.classList.contains("is-visible")) {
-    consider(elements.scoreHover.querySelector("svg"));
-  }
-  if (elements.petBubble.classList.contains("is-visible")) {
-    consider(elements.petBubble);
-  }
-  if (elements.petalTip.classList.contains("is-visible")) {
-    consider(elements.petalTip);
-  }
-
-  const margin = 22;
-  const extraW =
-    margin +
-    Math.max(0, sr.left - minX) +
-    Math.max(0, maxX - sr.right);
-  const extraH =
-    margin +
-    Math.max(0, sr.top - minY) +
-    Math.max(0, maxY - sr.bottom);
-
-  return { extraW: Math.ceil(extraW), extraH: Math.ceil(extraH) };
-}
 
 function scheduleSyncOrbWindow() {
   if (typeof shrink === "undefined" || typeof shrink.syncOrbContentSize !== "function") {
@@ -377,15 +329,12 @@ function scheduleSyncOrbWindow() {
     syncOrbTimer = null;
     const el = elements.shell;
     const br = el.getBoundingClientRect();
-    /* Absolute-positioned cat does not always inflate offsetHeight — use scroll + bounding box. */
-    let w = Math.ceil(Math.max(el.offsetWidth, el.scrollWidth, br.width));
-    let h = Math.ceil(Math.max(el.offsetHeight, el.scrollHeight, br.height));
-    const ov = measureCatHoverOverflowExtra();
-    w += ov.extraW;
-    h += ov.extraH;
+    /* Cat mode sizing is dominated by padded #shell box (no viewport-based enlargements). */
+    const w = Math.ceil(Math.max(el.offsetWidth, el.scrollWidth, br.width));
+    const h = Math.ceil(Math.max(el.offsetHeight, el.scrollHeight, br.height));
     if (
-      Math.abs(w - lastOrbDimensions.w) < 3 &&
-      Math.abs(h - lastOrbDimensions.h) < 3 &&
+      Math.abs(w - lastOrbDimensions.w) < 5 &&
+      Math.abs(h - lastOrbDimensions.h) < 5 &&
       (lastOrbDimensions.w > 0 || lastOrbDimensions.h > 0)
     ) {
       return;
@@ -396,18 +345,7 @@ function scheduleSyncOrbWindow() {
       height: Math.max(h, 1),
       keepTopRight: true,
     });
-  }, 120);
-}
-
-/** Tip text length changes bbox — throttle remeasure while hovering */
-function scheduleHoverBoundsSync() {
-  if (state.mode !== "cat") return;
-  if (hoverBoundsTimer) window.clearTimeout(hoverBoundsTimer);
-  hoverBoundsTimer = window.setTimeout(() => {
-    hoverBoundsTimer = null;
-    lastOrbDimensions = { w: 0, h: 0 };
-    scheduleSyncOrbWindow();
-  }, 70);
+  }, 160);
 }
 
 function buildIssueSections(scoreData) {
@@ -557,15 +495,6 @@ function showScoreHover() {
   }
   elements.scoreHover.classList.add("is-visible");
   elements.scoreHover.setAttribute("aria-hidden", "false");
-
-  if (!already) {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        lastOrbDimensions = { w: 0, h: 0 };
-        scheduleSyncOrbWindow();
-      });
-    });
-  }
 }
 
 function hideScoreHover() {
@@ -575,8 +504,6 @@ function hideScoreHover() {
   state.bubbleSuppressed = false;
   setBubbleVisible(state.bubbleVisible);
   hidePetalTip();
-  lastOrbDimensions = { w: 0, h: 0 };
-  scheduleSyncOrbWindow();
 }
 
 // ── Petal tooltip — one-line verdict per dimension ────────────────────────────
@@ -612,35 +539,33 @@ function showPetalTip(key) {
   const petal  = PETAL_TIP_DEFS.find(p => p.key === key);
   const mRad   = petal.center * Math.PI / 180;
 
-  // Use viewport coords — tooltip is position:fixed so it escapes all parent clipping
-  const rect = elements.catWrap.getBoundingClientRect();
-  const cx   = rect.left + rect.width  / 2;
-  const cy   = rect.top  + rect.height / 2;
+  const sr = elements.shell.getBoundingClientRect();
+  const cr = elements.catWrap.getBoundingClientRect();
+  /* Coordinates relative to #shell — same box as Electron clip + no window resize jitter */
+  const cx = cr.left + cr.width / 2 - sr.left;
+  const cy = cr.top + cr.height / 2 - sr.top;
   const tipX = cx + TIP_R * Math.cos(mRad);
   const tipY = cy + TIP_R * Math.sin(mRad);
 
-  // Cat is always top-right → right-align all tips so text extends leftward,
-  // never overflows the right screen edge.
+  // Cat is always top-right → right-align tips so wrapping text grows leftward
   const isDown = petal.center <= 100;
-  const xform  = isDown
-    ? "translate(-100%, 4px)"               // Clarity (down): right edge at anchor
-    : "translate(calc(-100% - 4px), -50%)"; // Safety/Tone (left): right edge at anchor
+  const xform = isDown
+    ? "translate(-100%, 4px)"
+    : "translate(calc(-100% - 4px), -50%)";
 
   const tip = elements.petalTip;
-  tip.textContent     = text;
-  tip.style.left      = `${tipX}px`;
-  tip.style.top       = `${tipY}px`;
+  tip.textContent = text;
+  tip.style.left = `${tipX}px`;
+  tip.style.top = `${tipY}px`;
   tip.style.transform = xform;
   tip.classList.add("is-visible");
   tip.setAttribute("aria-hidden", "false");
-  scheduleHoverBoundsSync();
 }
 
 function hidePetalTip() {
   if (!elements.petalTip || !elements.petalTip.classList.contains("is-visible")) return;
   elements.petalTip.classList.remove("is-visible");
   elements.petalTip.setAttribute("aria-hidden", "true");
-  scheduleHoverBoundsSync();
 }
 
 // Click anywhere in the petal band opens the full panel.

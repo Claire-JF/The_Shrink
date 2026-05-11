@@ -69,6 +69,7 @@ button {
   position: relative;
   margin: 0;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 /* Cat-only: tight width like a desktop float orb; panel hidden from layout.
@@ -77,14 +78,14 @@ button {
    Extra bottom/left padding reserves space for radial petals + speech bubble (SVG overflows ~113px). */
 body.mode-cat .shell {
   width: max-content;
-  /* Avoid 100vw — it tracks BrowserWindow size and causes resize ↔ sync jitter */
-  max-width: 420px;
-  min-width: 280px;
+  max-width: none;
+  min-width: 320px;
   min-height: calc(var(--cat-size) + 32px);
   /*
-   * Base cushion; exact fit comes from app.js measureCatHoverOverflowExtra() (SVG + tip text length).
+   * Fixed px only — vw/vh would couple to BrowserWindow size and fight ResizeObserver sync.
+   * Left generous for petal labels + wrapping tip anchored left of cat centre.
    */
-  padding: 20px 20px 220px 220px;
+  padding: 24px 32px 500px 520px;
   box-sizing: border-box;
 }
 
@@ -971,13 +972,16 @@ body.phase-optimized .panel__footer {
   outline-color: rgba(98, 213, 180, 0.28);
 }
 
-/* Petal hover tooltip — short one-line verdict per dimension */
+/* Petal hover tooltip — inside #shell (absolute coords from cat centre) */
 .petal-tip {
-  position: fixed;          /* escapes all parent stacking / overflow */
-  white-space: nowrap;
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: 300px;
+  white-space: normal;
   font-size: 11px;
-  line-height: 1;
-  padding: 5px 12px;
+  line-height: 1.35;
+  padding: 6px 12px;
   border-radius: 20px;
   /* Match petal visual language: same dark tint, same translucency level */
   background: rgba(8, 14, 36, 0.38);

@@ -101,9 +101,11 @@
           </button>
         </footer>
       </section>
+
+      <!-- Inside #shell so it shares clip/hit-testing with petals (no jittery window resize hacks) -->
+      <div class="petal-tip" id="petalTip" aria-hidden="true" role="tooltip"></div>
     </div>
 
-    <div class="petal-tip" id="petalTip" aria-hidden="true" role="tooltip"></div>
     <script src="./app.js"></script>
   </body>
 </html>
