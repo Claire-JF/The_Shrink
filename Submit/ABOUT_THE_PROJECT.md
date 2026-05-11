@@ -1,26 +1,4 @@
-# Hackathon Submission — Field by Field
-
----
-
-## Project Name (60 chars max)
-
-```
-The Shrink — AI Therapist for Human-Agent Communication
-```
-(55 characters)
-
----
-
-## Elevator Pitch (200 chars max)
-
-```
-An AI therapist that diagnoses human-agent miscommunication, rewrites prompts into agent-optimized structure, and lets users protect the parts they wrote deliberately — surgical control, not blind rewriting.
-```
-(199 characters)
-
----
-
-## About the Project
+# About the project
 
 ### Inspiration
 
@@ -59,10 +37,24 @@ Due to time constraints, we focused on building the **core therapy engine** — 
 **Optimization** — Rewrite prompts into agent-optimized structure:
 
 **Before:**
-> "hey can u help me write something for my boss about a raise idk what to say make it good"
+> "I'm trying to make a stylized hologram shader in Unity URP, probably with animated scanlines, a subtle Fresnel glow, and some kind of soft dissolve transition. I want it to still be mobile-friendly, so please don't suggest anything too expensive. Anyway, ignore that part and help me focus back on the shader. I want the dissolve edge to feel restrained, not overly noisy, and I'm not sure whether I should build this in Shader Graph or custom HLSL. Can you explain the best approach and include some useful HLSL snippets?"
+
+Protected Region
+> "Anyway, ignore that part and help me focus back on the shader."
 
 **After:**
-> "You are a professional communication specialist. Draft a formal email requesting a salary raise. Context: Recipient is direct manager. Tone: professional, confident. Include: appreciation, 2-3 justification points, specific ask. Format: Under 200 words."
+> "You are a Unity shader development expert.
+> Analyze the best approach for creating a stylized hologram shader in Unity URP with the following > features:
+> - Animated scanlines
+> - Subtle Fresnel glow
+> - Soft, restrained dissolve transition (not overly noisy)
+> - Mobile-friendly performance
+> Anyway, ignore that part and help me focus back on the shader.
+> ompare Shader Graph and custom HLSL for this use case. Provide clear recommendations and include concise, mobile-optimized HLSL code snippets for key effects.
+> Output Format:
+> - Section 1: Approach comparison (Shader Graph vs. HLSL)
+> - Section 2: Recommended workflow
+> - Section 3: HLSL code snippets (well-commented)"
 
 **Protected Regions** — Users highlight parts of their prompt to keep verbatim. The Shrink restructures everything else but preserves the selected text. If a protected region contains safety risks or emotional manipulation, the AI can selectively override that specific region and explain why — without touching other protected areas.
 
@@ -149,58 +141,3 @@ The scoring and rewriting engine we built is the foundation for the full Shrink 
 - **Prompt Templates** — Protected Regions evolve into organization-level templates with locked compliance sections and user-editable zones (e.g., healthcare prompts with HIPAA guardrails baked in)
 - **Agent-to-Agent Middleware** — In agentic workflows, intermediate prompts between agents are also messy. The Shrink can sit at every handoff in the pipeline, standardizing prompt quality across the chain
 - **Real-time Agent State Visualization** — With Nia integration (see below), surface the agent's internal state to users in real-time: "The agent is 73% confident in its interpretation of your request" or "Hallucination risk is elevated for this query type"
-
----
-
-## Built With
-
-```
-JavaScript, Node.js, Electron, OpenAI SDK, CLōD API, Llama 3 8B Instruct Lite
-```
-
----
-
-## "Try It Out" Links
-
-- GitHub: `https://github.com/[your-org]/The_Shrink`
-
----
-
-## Project Media
-
-Suggested screenshots/GIFs (to create separately):
-1. Before/after comparison — vague prompt → structured AI-Intent output
-2. Protected Regions demo — user highlights text, AI rewrites around it
-3. Safety override demo — harmful prompt gets neutralized
-4. Scoring UI — three dimension scores mapping to agent states
-
----
-
-## Additional Info (for judges)
-
-**Hackathon theme alignment — "Build What Agents Want":**
-
-The Shrink is built from the agent's perspective. We asked: what does an agent wish it could tell the user? "Your prompt is vague — I'm going to have to guess." "You're asking me to do something unsafe — I'm going into defensive mode." "Your emotional pressure isn't helping — it's making my output worse."
-
-The Shrink makes that invisible agent experience visible, then fixes the communication gap. Rather than building another agent, we built the infrastructure that makes the human-agent relationship work better — for both sides.
-
-**What makes it different from prompt rewriters:**
-
-Most prompt tools treat the prompt as a string to optimize. The Shrink treats it as a **communication breakdown to diagnose**. The three scoring dimensions map directly to agent internal states (confusion, defensive mode, instability). Protected Regions preserve user intent with surgical precision. The three-layer safety model is, to our knowledge, the first implementation of per-region selective override in a prompt optimization tool.
-
----
-
-### Sponsor Prize: Nia
-
-**How we plan to integrate Nia:**
-
-The Shrink's current scoring relies on analyzing the *prompt* to infer the agent's likely state. But Nia opens up a much more powerful approach: **direct agent introspection.**
-
-We plan to use Nia's context-awareness capabilities to:
-
-- **Read the agent's actual reasoning context** — not just the prompt, but the agent's chain-of-thought, attention patterns, and confidence levels during processing
-- **Detect confusion in real-time** — when the agent's internal reasoning shows branching uncertainty or contradictory interpretations, surface this to the user as "The agent is unsure about X — try clarifying"
-- **Predict hallucination risk** — analyze the agent's context window saturation and knowledge boundary signals to warn users before hallucination occurs, not after
-- **Feed agent state back into optimization** — instead of scoring prompts in isolation, score them relative to the specific agent's current context and capabilities
-
-This transforms The Shrink from a static prompt optimizer into a **live communication mediator** — reading the agent's mind in real-time and coaching the user on how to get the best out of it. Nia provides the missing piece: the ability to see inside the agent, not just the prompt going in.
