@@ -82,10 +82,9 @@ body.mode-cat .shell {
   min-width: 280px;
   min-height: calc(var(--cat-size) + 32px);
   /*
-   * Large cushion for hover petals: SVG arcs ~113px from centre, text labels, scale-in animation,
-   * and OS compositor clipping — bias extra space left + bottom (fan opens toward lower-left).
+   * Base cushion; exact fit comes from app.js measureCatHoverOverflowExtra() (SVG + tip text length).
    */
-  padding: 20px 20px 300px 300px;
+  padding: 20px 20px 220px 220px;
   box-sizing: border-box;
 }
 
