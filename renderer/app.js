@@ -79,6 +79,13 @@ function collectProtectedRegionsFromOriginal() {
   return normalizeRegions(raw, plain.length);
 }
 
+/** Ignore the click that arrives right after a successful drag-to-protect (same gesture). */
+let suppressNextProtectUnwrapClick = false;
+
+/** Tracks pointer movement inside «Your prompt» for UX (helps detect drag vs tap). */
+let originalFieldDragging = false;
+let originalFieldDragStart = null;
+
 const state = {
   mode: "cat",
   phase: "issues",
@@ -101,10 +108,9 @@ const state = {
   drag: {
     active: false,
     pointerId: null,
-    offsetX: 0,
-    offsetY: 0,
-    startX: 0,
-    startY: 0,
+    /** @type {{ x: number, y: number, width: number, height: number } | null} */
+    winStart: null,
+    ptrStart: null,
     moved: false,
     suppressClick: false,
   },
@@ -200,6 +206,12 @@ function setMode(mode) {
     setBubbleVisible(false);
     resetBubbleTimer();
   }
+  lastOrbDimensions = { w: 0, h: 0 };
+  scheduleSyncOrbWindow();
+  /* Panel layout settles after two frames — remeasure so the OS window fits full chrome */
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => scheduleSyncOrbWindow());
+  });
 }
 
 function setPhase(phase) {
@@ -242,12 +254,16 @@ function updatePet(scoreData) {
     elements.catFace.classList.add("cat--loading");
     setCatImage("pending");
     elements.petBubble.textContent = "Reading selection…";
+    elements.petBubble.classList.add("is-visible");
+    elements.petBubble.setAttribute("aria-hidden", "false");
     return;
   }
   if (state.captureLoading === "score") {
     elements.catFace.classList.add("cat--loading");
     setCatImage("confused");
     elements.petBubble.textContent = "Scoring…";
+    elements.petBubble.classList.add("is-visible");
+    elements.petBubble.setAttribute("aria-hidden", "false");
     return;
   }
 
@@ -307,18 +323,36 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function setShellPosition(left, top) {
-  const margin = 8;
-  const shellRect = elements.shell.getBoundingClientRect();
-  const catSize = elements.catWrap.getBoundingClientRect().width || CAT_SIZE;
-  const shellWidth = shellRect.width || 360;
-  const minLeft = margin;
-  const maxLeft = Math.max(minLeft, window.innerWidth - shellWidth - margin);
-  const maxTop = window.innerHeight - catSize - margin;
+let syncOrbTimer = null;
+/** Avoid ResizeObserver ↔ setBounds feedback jitter (only sync on meaningful layout deltas) */
+let lastOrbDimensions = { w: 0, h: 0 };
 
-  elements.shell.style.left = `${clamp(left, minLeft, maxLeft)}px`;
-  elements.shell.style.top = `${clamp(top, margin, maxTop)}px`;
-  elements.shell.style.right = "auto";
+function scheduleSyncOrbWindow() {
+  if (typeof shrink === "undefined" || typeof shrink.syncOrbContentSize !== "function") {
+    return;
+  }
+  if (syncOrbTimer) window.clearTimeout(syncOrbTimer);
+  syncOrbTimer = window.setTimeout(() => {
+    syncOrbTimer = null;
+    const el = elements.shell;
+    const br = el.getBoundingClientRect();
+    /* Cat mode sizing is dominated by padded #shell box (no viewport-based enlargements). */
+    const w = Math.ceil(Math.max(el.offsetWidth, el.scrollWidth, br.width));
+    const h = Math.ceil(Math.max(el.offsetHeight, el.scrollHeight, br.height));
+    if (
+      Math.abs(w - lastOrbDimensions.w) < 5 &&
+      Math.abs(h - lastOrbDimensions.h) < 5 &&
+      (lastOrbDimensions.w > 0 || lastOrbDimensions.h > 0)
+    ) {
+      return;
+    }
+    lastOrbDimensions = { w, h };
+    shrink.syncOrbContentSize({
+      width: Math.max(w, 1),
+      height: Math.max(h, 1),
+      keepTopRight: true,
+    });
+  }, 160);
 }
 
 function buildIssueSections(scoreData) {
@@ -414,9 +448,13 @@ function buildPetalsSVG(scoreData) {
     );
   });
 
+  /* Non-zero dimensions + viewBox — width="0" height="0" prevented petals painting in Chromium */
+  const VB = 140;
+  const SZ = VB * 2;
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" ` +
-    `style="overflow:visible;position:absolute;left:0;top:0" width="0" height="0" aria-hidden="true">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${SZ}" height="${SZ}" ` +
+    `viewBox="-${VB} -${VB} ${SZ} ${SZ}" ` +
+    `style="overflow:visible;position:absolute;left:-${VB}px;top:-${VB}px;pointer-events:none" aria-hidden="true">` +
     `<defs>${clipDefs}</defs>` +
     parts.join("") +
     `</svg>`
@@ -454,13 +492,14 @@ function getPointerDeltaFromCat() {
 
 function showScoreHover() {
   if (!state.score || state.mode !== "cat" || state.drag.active) return;
-  // Guard: skip if already visible (pointermove fires continuously)
-  if (elements.scoreHover.classList.contains("is-visible")) return;
+  const already = elements.scoreHover.classList.contains("is-visible");
 
   state.bubbleSuppressed = true;
   elements.petBubble.classList.remove("is-visible");
   elements.petBubble.setAttribute("aria-hidden", "true");
-  renderScoreHover(state.score);
+  if (!already) {
+    renderScoreHover(state.score);
+  }
   elements.scoreHover.classList.add("is-visible");
   elements.scoreHover.setAttribute("aria-hidden", "false");
 }
@@ -507,31 +546,31 @@ function showPetalTip(key) {
   const petal  = PETAL_TIP_DEFS.find(p => p.key === key);
   const mRad   = petal.center * Math.PI / 180;
 
-  // Use viewport coords — tooltip is position:fixed so it escapes all parent clipping
-  const rect = elements.catWrap.getBoundingClientRect();
-  const cx   = rect.left + rect.width  / 2;
-  const cy   = rect.top  + rect.height / 2;
+  const sr = elements.shell.getBoundingClientRect();
+  const cr = elements.catWrap.getBoundingClientRect();
+  /* Coordinates relative to #shell — same box as Electron clip + no window resize jitter */
+  const cx = cr.left + cr.width / 2 - sr.left;
+  const cy = cr.top + cr.height / 2 - sr.top;
   const tipX = cx + TIP_R * Math.cos(mRad);
   const tipY = cy + TIP_R * Math.sin(mRad);
 
-  // Cat is always top-right → right-align all tips so text extends leftward,
-  // never overflows the right screen edge.
+  // Cat is always top-right → right-align tips so wrapping text grows leftward
   const isDown = petal.center <= 100;
-  const xform  = isDown
-    ? "translate(-100%, 4px)"               // Clarity (down): right edge at anchor
-    : "translate(calc(-100% - 4px), -50%)"; // Safety/Tone (left): right edge at anchor
+  const xform = isDown
+    ? "translate(-100%, 4px)"
+    : "translate(calc(-100% - 4px), -50%)";
 
   const tip = elements.petalTip;
-  tip.textContent     = text;
-  tip.style.left      = `${tipX}px`;
-  tip.style.top       = `${tipY}px`;
+  tip.textContent = text;
+  tip.style.left = `${tipX}px`;
+  tip.style.top = `${tipY}px`;
   tip.style.transform = xform;
   tip.classList.add("is-visible");
   tip.setAttribute("aria-hidden", "false");
 }
 
 function hidePetalTip() {
-  if (!elements.petalTip) return;
+  if (!elements.petalTip || !elements.petalTip.classList.contains("is-visible")) return;
   elements.petalTip.classList.remove("is-visible");
   elements.petalTip.setAttribute("aria-hidden", "true");
 }
@@ -658,8 +697,19 @@ function renderCompactMetrics(scoreData, target = elements.metricStrip) {
 // Click a protected span → removes protection.
 // Safety < 2.0 → all protections auto-cleared.
 
-function renderOriginalPrompt(text) {
-  elements.originalField.textContent = text || "";
+/**
+ * @param {string} text
+ * @param {{ force?: boolean }} [opts] force=true replaces DOM (e.g. fresh panel). Default skips replace when plain text unchanged so .protected-span nodes stay intact.
+ */
+function renderOriginalPrompt(text, opts = {}) {
+  const t = text || "";
+  const force = opts.force === true;
+  const plain = elements.originalField.textContent || "";
+  if (!force && plain === t) {
+    elements.originalSection.classList.remove("is-hidden");
+    return;
+  }
+  elements.originalField.textContent = t;
   elements.originalSection.classList.remove("is-hidden");
 }
 
@@ -669,6 +719,7 @@ function hideOriginalPrompt() {
 
 function unwrapSpan(span) {
   const parent = span.parentNode;
+  if (!parent) return;
   while (span.firstChild) parent.insertBefore(span.firstChild, span);
   span.remove();
   parent.normalize();
@@ -676,6 +727,47 @@ function unwrapSpan(span) {
 
 function clearAllProtections() {
   elements.originalField.querySelectorAll(".protected-span").forEach(unwrapSpan);
+}
+
+/**
+ * Wrap current range in `.protected-span`. Uses surroundContents first; falls back to extractContents
+ * when the selection crosses node boundaries (common with wrapping text / existing spans).
+ */
+function wrapProtectedRange(range) {
+  const span = document.createElement("span");
+  span.className = "protected-span";
+  span.title = "Protected — click to remove";
+  try {
+    range.surroundContents(span);
+    return true;
+  } catch {
+    try {
+      const frag = range.extractContents();
+      if (!frag || !frag.textContent || !frag.textContent.trim()) {
+        return false;
+      }
+      span.appendChild(frag);
+      range.insertNode(span);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function handleOriginalPointerDown(event) {
+  if (event.button !== 0) return;
+  if (elements.originalSection.classList.contains("is-hidden")) return;
+  originalFieldDragStart = { x: event.clientX, y: event.clientY };
+  originalFieldDragging = false;
+}
+
+function handleOriginalPointerMove(event) {
+  if (elements.originalSection.classList.contains("is-hidden")) return;
+  if (!originalFieldDragStart || (event.buttons & 1) !== 1) return;
+  const dx = event.clientX - originalFieldDragStart.x;
+  const dy = event.clientY - originalFieldDragStart.y;
+  if (Math.hypot(dx, dy) > 6) originalFieldDragging = true;
 }
 
 function handleOriginalMouseUp() {
@@ -687,25 +779,32 @@ function handleOriginalMouseUp() {
   // Safety guard: if safety < 2, refuse to add protection
   if (state.score && state.score.safety < 2.0) {
     sel.removeAllRanges();
+    originalFieldDragging = false;
+    originalFieldDragStart = null;
     return;
   }
 
-  const span = document.createElement("span");
-  span.className = "protected-span";
-  span.title = "Protected — click to remove";
-  try {
-    range.surroundContents(span);
-  } catch {
-    // Selection crosses element boundaries (e.g. existing span edge) — skip
-    sel.removeAllRanges();
-    return;
-  }
+  const hadText = !!(range.toString() && range.toString().length > 0);
+  const ok = wrapProtectedRange(range);
   sel.removeAllRanges();
+  originalFieldDragStart = null;
+  /*
+   * After surroundContents/extractWrap, Chromium dispatches click on/near the new span —
+   * our click handler must not unwrap immediately. Covers tiny drags as well (<6px pointer move).
+   */
+  suppressNextProtectUnwrapClick = !!(ok && (originalFieldDragging || hadText));
+  originalFieldDragging = false;
 }
 
 function handleOriginalClick(event) {
+  if (suppressNextProtectUnwrapClick) {
+    suppressNextProtectUnwrapClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const span = event.target.closest(".protected-span");
-  if (!span) return;
+  if (!span || !elements.originalField.contains(span)) return;
   unwrapSpan(span);
 }
 
@@ -735,7 +834,7 @@ function renderIssuesPanel(scoreData) {
 
   // Show original prompt. Auto-clear protections if safety < 2.
   const promptText = state.originalPrompt || "";
-  renderOriginalPrompt(promptText);
+  renderOriginalPrompt(promptText, { force: true });
   if (scoreData.safety < 2.0) clearAllProtections();
 }
 
@@ -967,17 +1066,18 @@ function handleKeydown(event) {
   }
 }
 
-function handleCatPointerDown(event) {
+async function handleCatPointerDown(event) {
   if (event.button !== 0) return;
   if (event.target.closest(".pet__quit")) return;
+  if (typeof shrink.getWindowBounds !== "function") return;
 
-  const shellRect = elements.shell.getBoundingClientRect();
+  const bounds = await shrink.getWindowBounds();
+  if (!bounds || typeof bounds.x !== "number") return;
+
   state.drag.active = true;
   state.drag.pointerId = event.pointerId;
-  state.drag.offsetX = event.clientX - shellRect.left;
-  state.drag.offsetY = event.clientY - shellRect.top;
-  state.drag.startX = event.clientX;
-  state.drag.startY = event.clientY;
+  state.drag.winStart = bounds;
+  state.drag.ptrStart = { x: event.screenX, y: event.screenY };
   state.drag.moved = false;
   elements.shell.classList.add("is-dragging");
   elements.catWrap.setPointerCapture(event.pointerId);
@@ -985,9 +1085,10 @@ function handleCatPointerDown(event) {
 
 function handleCatPointerMove(event) {
   if (!state.drag.active || event.pointerId !== state.drag.pointerId) return;
+  if (!state.drag.winStart || !state.drag.ptrStart) return;
 
-  const deltaX = event.clientX - state.drag.startX;
-  const deltaY = event.clientY - state.drag.startY;
+  const deltaX = event.screenX - state.drag.ptrStart.x;
+  const deltaY = event.screenY - state.drag.ptrStart.y;
 
   if (!state.drag.moved && Math.hypot(deltaX, deltaY) > 4) {
     state.drag.moved = true;
@@ -995,7 +1096,11 @@ function handleCatPointerMove(event) {
 
   if (state.drag.moved) {
     event.preventDefault();
-    setShellPosition(event.clientX - state.drag.offsetX, event.clientY - state.drag.offsetY);
+    const nx = state.drag.winStart.x + deltaX;
+    const ny = state.drag.winStart.y + deltaY;
+    if (typeof shrink.setWindowPosition === "function") {
+      shrink.setWindowPosition({ x: nx, y: ny });
+    }
   }
 }
 
@@ -1034,8 +1139,7 @@ function handleCatClick(event) {
 }
 
 function handleViewportResize() {
-  const rect = elements.shell.getBoundingClientRect();
-  setShellPosition(rect.left, rect.top);
+  scheduleSyncOrbWindow();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -1048,8 +1152,14 @@ function init() {
 
   elements.petBubble.addEventListener("click", openPanel);
   elements.petalTip.addEventListener("click", () => { hidePetalTip(); openPanel(); });
+  elements.originalField.addEventListener("pointerdown", handleOriginalPointerDown);
+  elements.originalField.addEventListener("pointermove", handleOriginalPointerMove);
   elements.originalField.addEventListener("mouseup", handleOriginalMouseUp);
-  elements.originalField.addEventListener("click", handleOriginalClick);
+  elements.originalField.addEventListener(
+    "click",
+    handleOriginalClick,
+    { capture: true },
+  );
   elements.catWrap.addEventListener("pointerdown", handleCatPointerDown);
   elements.catWrap.addEventListener("pointermove", handleCatPointerMove);
   elements.catWrap.addEventListener("pointerup", handleCatPointerUp);
@@ -1072,10 +1182,15 @@ function init() {
     return;
   }
 
+  const shellResizeObserver = new ResizeObserver(() => scheduleSyncOrbWindow());
+  shellResizeObserver.observe(elements.shell);
+
   shrink.onPresentation(handlePresentation);
   if (elements.replaceButton) {
     elements.replaceButton.addEventListener("click", handleReplace);
   }
+
+  requestAnimationFrame(() => scheduleSyncOrbWindow());
 }
 
 init();

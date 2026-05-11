@@ -248,6 +248,26 @@ function registerIpc() {
 
   ipcMain.handle(CHANNEL.FORWARD_PREFS_GET, () => require('./prefs').load(app));
 
+  ipcMain.handle('shrink:get-window-bounds', () => windowMod.getWindowBounds());
+
+  ipcMain.handle('shrink:set-window-position', (_e, payload) => {
+    const x = payload?.x;
+    const y = payload?.y;
+    if (typeof x !== 'number' || typeof y !== 'number') return { ok: false };
+    windowMod.setWindowPosition(x, y);
+    return { ok: true };
+  });
+
+  ipcMain.handle('shrink:sync-orb-content-size', (_e, payload) => {
+    const w = payload?.width;
+    const h = payload?.height;
+    if (typeof w !== 'number' || typeof h !== 'number') return { ok: false };
+    windowMod.syncOrbContentSize(w, h, {
+      keepTopRight: payload?.keepTopRight !== false,
+    });
+    return { ok: true };
+  });
+
   ipcMain.handle(CHANNEL.FORWARD_PREFS_SET, (_e, payload) => {
     const prefsStore = require('./prefs');
     const { TARGET_KEYS } = require('./forward-prompt');

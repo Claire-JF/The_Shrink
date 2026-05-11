@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld('shrink', {
   getForwardPrefs: () => ipcRenderer.invoke(CHANNEL.FORWARD_PREFS_GET),
   setForwardPrefs: (payload) =>
     ipcRenderer.invoke(CHANNEL.FORWARD_PREFS_SET, payload ?? {}),
+  getWindowBounds: () => ipcRenderer.invoke('shrink:get-window-bounds'),
+  setWindowPosition: (pos) => ipcRenderer.invoke('shrink:set-window-position', pos ?? {}),
+  syncOrbContentSize: (dims) => ipcRenderer.invoke('shrink:sync-orb-content-size', dims ?? {}),
   onPresentation: (fn) => {
     if (typeof fn !== 'function') return () => {};
     const handler = (_event, msg) => {
