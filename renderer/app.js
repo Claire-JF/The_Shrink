@@ -86,6 +86,9 @@ let suppressNextProtectUnwrapClick = false;
 let originalFieldDragging = false;
 let originalFieldDragStart = null;
 
+/** One finalize pass per gesture (pointerup storms / duplicate handlers). */
+let protectFinalizeScheduled = false;
+
 const state = {
   mode: "cat",
   phase: "issues",
@@ -805,14 +808,7 @@ function finalizeProtectFromSelection() {
     return;
   }
 
-  /* Safety guard: if safety < 2, refuse to add protection */
-  if (state.score && state.score.safety < 2.0) {
-    sel.removeAllRanges();
-    originalFieldDragging = false;
-    originalFieldDragStart = null;
-    return;
-  }
-
+  /* Low safety: backend may ignore regions on Optimize (see clearAllProtections in renderIssuesPanel). */
   const hadText = !!(range.toString() && range.toString().length > 0);
   const ok = wrapProtectedRange(range);
   sel.removeAllRanges();
@@ -824,11 +820,18 @@ function finalizeProtectFromSelection() {
 function scheduleFinalizeProtectPointerUp(event) {
   if (event.button !== 0) return;
   if (elements.originalSection.classList.contains("is-hidden")) return;
+  if (protectFinalizeScheduled) return;
+
   /*
-   * Let the browser finalize the Selection for this gesture before touching the DOM —
-   * needed when mouseup/target is outside `.original-field` (handled via capture).
+   * Double rAF: microtask fires before Selection is finalized in Chromium — yields empty collapsed range.
    */
-  queueMicrotask(() => finalizeProtectFromSelection());
+  protectFinalizeScheduled = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      protectFinalizeScheduled = false;
+      finalizeProtectFromSelection();
+    });
+  });
 }
 
 function handleOriginalClick(event) {

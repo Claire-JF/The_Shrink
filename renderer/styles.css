@@ -907,7 +907,8 @@ body.phase-optimized .panel__footer {
   color: var(--body);
   white-space: pre-wrap;
   word-break: break-word;
-  user-select: text;
+  -webkit-user-select: text !important;
+  user-select: text !important;
   cursor: text;
   max-height: min(240px, 42vh);
   overflow-y: auto;
