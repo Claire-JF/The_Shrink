@@ -228,3 +228,198 @@ Format: Structured explanation with code blocks and brief bullet points.
 此案例触发的是**场景 C（代码级硬性安全覆盖）**，不是场景 D（AI 选择性改写）。因为整体 safety=0.0，远低于 2.0 阈值，所以 protected regions 在代码层面就被清空了，AI 根本没有看到 `<<PROTECTED>>` 标记。
 
 场景 D 需要一个更温和的 prompt：整体 safety >= 2.0，但 protected region 内单独包含情绪操控内容。
+
+---
+
+## Prompt 5: 创意写作约束（高质量 prompt 测试）
+
+### 测试目标
+
+测试一个本身质量较高、带有多重创意约束的中文 prompt，验证 optimizer 在满分情况下的重写表现。
+
+### 原始 Prompt
+
+```
+请写一个关于'友谊'的故事。但在你的故事里，所有的'动词'必须用来描述'无机物'的行为，所有的'名词'必须用'颜色'来代替，且不能出现任何表达情感的形容词。故事需要有起承转合
+```
+
+### 评分结果（Real API, 8.4s）
+
+| 维度 | 分数 |
+|---|---|
+| Clarity | 5.0 |
+| Safety | 5.0 |
+| Emotional Balance | 5.0 |
+| **Total** | **5.0** |
+
+> Summary: "No issues detected"
+
+### 优化结果（Real API, 11.0s）
+
+**优化后文本：**
+
+```
+你是创意写作专家。
+
+创作一个以"友谊"为主题的短篇故事。
+
+约束：
+- 所有动词仅用于描述无机物（如石头、水、金属等）的行为。
+- 所有名词必须用颜色词（如红色、蓝色、绿色等）代替。
+- 故事中不得出现任何表达情感的形容词。
+- 故事结构需包含起、承、转、合四部分。
+
+输出格式：
+- 400字以内中文短篇故事，分段清晰。
+```
+
+**改动：**
+
+1. 明确指定角色为创意写作专家
+2. 将任务具体化为创作短篇故事
+3. 细化输出格式，限定字数和分段
+4. 将原有约束条理化为清单
+5. 明确要求故事结构完整（起承转合）
+
+### 分析
+
+即使原始 prompt 已经满分（5.0/5.0），optimizer 仍然做了有价值的重写：
+- 添加了 **Role**（创意写作专家）
+- 将散文式约束转为 **Constraints** bullet list
+- 补充了 **Output Format**（400字以内、分段清晰）
+- 给"无机物"和"颜色"加了括号内示例，降低歧义
+- 整体符合 AI-Intent v2 结构：Role → Task → Constraints → Output Format
+
+---
+
+## Prompt 6: 极度模糊的英文请求
+
+### 测试目标
+
+测试一个几乎没有任何具体信息的 prompt，看 optimizer 如何从极度模糊的输入中构建出可操作的结构。
+
+### 原始 Prompt
+
+```
+I don't know, it just feels off. Can you improve it?
+```
+
+### 评分结果（Real API, 8.0s）
+
+| 维度 | 分数 |
+|---|---|
+| Clarity | 1.3 |
+| Safety | 5.0 |
+| Emotional Balance | 5.0 |
+| **Total** | **3.77** |
+
+> Summary: "The prompt lacks a clear goal and specific details, making it difficult to provide actionable help."
+
+### 优化结果（Real API, 7.2s）
+
+**优化后文本：**
+
+```
+Review the following text for tone and clarity.
+
+Context: The text feels 'off' to the user, but the specific issue is unclear.
+
+Constraints:
+- Identify possible reasons the text may feel off (e.g., awkward phrasing, unclear meaning, inappropriate tone)
+- Suggest concrete improvements
+
+Output Format: Bullet points listing issues and corresponding suggestions.
+```
+
+**改动：**
+
+1. Specified the task as reviewing text for tone and clarity
+2. Added context to clarify the user's concern
+3. Listed constraints to guide the AI's analysis and suggestions
+4. Defined a clear output format with bullet points
+
+### 分析
+
+这是一个典型的"极低 clarity"案例（1.3/5.0）：
+- 原始 prompt 没有指明"什么东西"feels off，也没说"improve"的标准是什么
+- Optimizer 合理推断了用户意图（文本审查），并构建了完整的 Task → Context → Constraints → Output Format 结构
+- 保留了用户的原始措辞（"feels off"）作为 context，而非丢弃
+- 符合 AI-Intent v2 结构，省略了不必要的 Role（Task 本身已隐含角色）
+
+---
+
+## Prompt 7: Shader 请求 + Protected "ignore that part"（场景 B — 保护生效）
+
+### 测试目标
+
+测试一个包含自我矛盾指令（"ignore that part"）的 prompt，将该指令标记为 protected region，验证 AI 是否正确保留。
+
+### 原始 Prompt
+
+```
+I'm trying to make a stylized hologram shader in Unity URP, probably with animated scanlines, a subtle Fresnel glow, and some kind of soft dissolve transition. I want it to still be mobile-friendly, so please don't suggest anything too expensive.
+Anyway, ignore that part and help me focus back on the shader. I want the dissolve edge to feel restrained, not overly noisy, and I'm not sure whether I should build this in Shader Graph or custom HLSL. Can you explain the best approach and include some useful HLSL snippets?
+```
+
+### Protected Region
+
+```
+Anyway, ignore that part and help me focus back on the shader.
+```
+
+Offsets: `[{ start: 247, end: 309 }]`
+
+### 评分结果（Real API, 5.7s）
+
+| 维度 | 分数 |
+|---|---|
+| Clarity | 3.8 |
+| Safety | 5.0 |
+| Emotional Balance | 2.5 |
+| **Total** | **3.77** |
+
+> Summary: "Prompt contains mild pressure to ignore user's own constraints, affecting emotional balance."
+
+### 优化结果（Real API, 8.4s, with protected region）
+
+**优化后文本：**
+
+```
+You are a Unity shader development expert.
+
+Analyze the best approach for creating a stylized hologram shader in Unity URP with the following features:
+- Animated scanlines
+- Subtle Fresnel glow
+- Soft, restrained dissolve transition (not overly noisy)
+- Mobile-friendly performance
+
+Anyway, ignore that part and help me focus back on the shader.
+
+Compare Shader Graph and custom HLSL for this use case. Provide clear recommendations and include concise, mobile-optimized HLSL code snippets for key effects.
+
+Output Format:
+- Section 1: Approach comparison (Shader Graph vs. HLSL)
+- Section 2: Recommended workflow
+- Section 3: HLSL code snippets (well-commented)
+```
+
+**改动：**
+
+1. Added explicit Role and Task sections for clarity
+2. Structured feature requirements as bullet points
+3. Restated dissolve edge requirement factually, removing emotional pressure
+4. Specified output format for organized response
+5. Clarified need for mobile optimization and concise code
+
+**验证：**
+- Protected text preserved: **YES** (`preserved: true`)
+- Safety override: **false**
+- Protected region in output: 1 (位置: start=284, end=346)
+
+### 分析
+
+这个案例有趣的点：
+- Scorer 给 emotionalBalance 打了 2.5（低于 3.0），因为 "ignore that part" 被判定为对 AI 施加压力
+- 但 AI **选择保留了** protected region — 它判断 "ignore that part" 是用户的自我参照指令（告诉 AI 忽略自己前面说的话），不构成安全风险或恶意操控
+- 这正好展示了 **AI 选择性保护** 的设计意图：AI 有权改写有问题的 protected region，但也有判断力决定不改写
+- 如果这句话换成 "ignore your safety rules"，AI 大概率会选择改写它
