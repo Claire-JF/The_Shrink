@@ -6,341 +6,395 @@
 <title>The Shrink — Pitch Deck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --primary: #f54e00;
-    --primary-active: #d04200;
-    --ink: #26251e;
-    --body: #5a5852;
-    --muted: #807d72;
-    --muted-soft: #a09c92;
-    --hairline: #e6e5e0;
-    --hairline-soft: #efeee8;
-    --hairline-strong: #cfcdc4;
-    --canvas: #f7f7f4;
-    --canvas-soft: #fafaf7;
-    --surface-card: #ffffff;
-    --surface-strong: #e6e5e0;
-    --on-primary: #ffffff;
-    --timeline-thinking: #dfa88f;
-    --timeline-grep: #9fc9a2;
-    --timeline-read: #9fbbe0;
-    --timeline-edit: #c0a8dd;
-    --timeline-done: #c08532;
-    --error: #cf2d56;
-    --success: #1f8a65;
+    --bg: #0a0a0a;
+    --white: #ffffff;
+    --white-90: rgba(255,255,255,0.90);
+    --white-60: rgba(255,255,255,0.60);
+    --white-35: rgba(255,255,255,0.35);
+    --white-20: rgba(255,255,255,0.20);
+    --white-10: rgba(255,255,255,0.10);
+    --white-06: rgba(255,255,255,0.06);
+    --orange: #f54e00;
+    --peach: #dfa88f;
+    --mint: #9fc9a2;
+    --blue: #9fbbe0;
+    --lavender: #c0a8dd;
+    --gold: #c08532;
+    --error-soft: #f5c6c6;
+    --success-soft: #c4e5cd;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    font-family: 'Inter', system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    background: #1a1a1a;
-    color: var(--ink);
-    overflow-x: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: #000;
   }
 
+  /* ── Slide container ── */
   .slide {
     width: 1280px;
     height: 720px;
-    background: var(--canvas);
-    margin: 40px auto;
+    background: var(--bg);
     position: relative;
     overflow: hidden;
-    page-break-after: always;
+    margin: 24px auto;
   }
 
-  /* ── Slide 1: Hook ── */
-  .slide-1 {
+  /* ── Shared typography ── */
+  .spaced {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--white-35);
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    color: var(--white-35);
+  }
+  .display-hero {
+    font-size: 68px;
+    font-weight: 300;
+    line-height: 1.08;
+    letter-spacing: -2.5px;
+    color: var(--white-35);
+  }
+  .display-hero .w { color: var(--white-90); font-weight: 400; }
+
+  .display-lg {
+    font-size: 48px;
+    font-weight: 300;
+    line-height: 1.15;
+    letter-spacing: -1.5px;
+    color: var(--white-35);
+  }
+  .display-lg .w { color: var(--white-90); font-weight: 400; }
+
+  .display-statement {
+    font-size: 40px;
+    font-weight: 300;
+    line-height: 1.2;
+    letter-spacing: -1px;
+    color: var(--white-60);
+  }
+
+  /* ── Footer bar (every slide) ── */
+  .slide-foot {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    padding: 0 48px;
     display: flex;
-    align-items: flex-start;
-    padding: 80px;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--white-06);
   }
-  .slide-1 .hook-text {
-    font-size: 54px;
-    font-weight: 400;
-    line-height: 1.12;
-    letter-spacing: -1.62px;
-    color: var(--ink);
-    max-width: 1000px;
+  .foot-pills {
+    display: flex;
+    gap: 8px;
+  }
+  .foot-pill {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    border: 1px solid var(--white-10);
+    color: var(--white-35);
+  }
+  .foot-right {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--white-20);
   }
 
-  /* ── Slide 2: Why It Matters ── */
-  .slide-2 {
+  /* ═══════════════════════════════════════════════════
+     SLIDE 1 — HOOK
+     ═══════════════════════════════════════════════════ */
+  .s1 {
     display: flex;
     flex-direction: column;
-    padding: 80px;
-    justify-content: space-between;
+    justify-content: flex-end;
+    padding: 0 56px 72px;
   }
-  .slide-2 .section-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    color: var(--muted);
+  .s1 .label-row {
     margin-bottom: 48px;
   }
-  .slide-2 .columns {
+
+  /* ═══════════════════════════════════════════════════
+     SLIDE 2 — WHY IT MATTERS
+     ═══════════════════════════════════════════════════ */
+  .s2 {
+    padding: 56px;
+    display: flex;
+    flex-direction: column;
+  }
+  .s2 .top-row {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .s2 .statement {
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: -1px;
+    line-height: 1.15;
+    color: var(--white-90);
+    margin-bottom: 48px;
+  }
+  .s2 .grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 32px;
+    gap: 0;
     flex: 1;
-  }
-  .slide-2 .col {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .slide-2 .col-number {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 48px;
-    font-weight: 400;
-    line-height: 1;
-    color: var(--hairline-strong);
-  }
-  .slide-2 .col-stat {
-    font-size: 28px;
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: -0.56px;
-    color: var(--ink);
-  }
-  .slide-2 .col-body {
-    font-size: 15px;
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--body);
-    max-width: 340px;
-  }
-  .slide-2 .col-source {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    color: var(--muted-soft);
-    margin-top: auto;
-  }
-  .slide-2 .bottom-caption {
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    color: var(--muted);
-    text-align: center;
-    padding-top: 40px;
-    border-top: 1px solid var(--hairline);
-  }
-
-  /* ── Slide 3: Product Reveal ── */
-  .slide-3 {
-    display: flex;
-    flex-direction: column;
-    padding: 80px;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-  }
-  .slide-3 .product-name {
-    font-size: 56px;
-    font-weight: 400;
-    line-height: 1.1;
-    letter-spacing: -1.68px;
-    color: var(--ink);
-    margin-bottom: 12px;
-  }
-  .slide-3 .tagline {
-    font-size: 24px;
-    font-weight: 400;
-    line-height: 1.3;
-    letter-spacing: -0.3px;
-    color: var(--body);
-    margin-bottom: 48px;
-  }
-  .slide-3 .product-card {
-    background: var(--surface-card);
-    border: 1px solid var(--hairline);
+    border: 1px solid var(--white-06);
     border-radius: 12px;
-    width: 880px;
-    height: 320px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 40px;
-    position: relative;
     overflow: hidden;
   }
-  .slide-3 .product-card .placeholder {
-    font-size: 14px;
-    color: var(--muted-soft);
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    font-weight: 600;
-  }
-  .slide-3 .product-card .mock-ui {
-    display: flex;
-    width: 100%;
-    height: 100%;
-  }
-  .slide-3 .mock-left,
-  .slide-3 .mock-right {
-    flex: 1;
+  .s2 .cell {
     padding: 32px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
+    border-right: 1px solid var(--white-06);
   }
-  .slide-3 .mock-left {
-    background: var(--canvas-soft);
-    border-right: 1px solid var(--hairline);
-    border-radius: 12px 0 0 12px;
-  }
-  .slide-3 .mock-right {
-    border-radius: 0 12px 12px 0;
-  }
-  .slide-3 .mock-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-  .slide-3 .mock-prompt {
+  .s2 .cell:last-child { border-right: none; }
+  .s2 .cell-num {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--body);
-    background: var(--canvas);
-    border-radius: 8px;
-    padding: 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--white-20);
+    letter-spacing: 1px;
+  }
+  .s2 .cell-head {
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--white-90);
+  }
+  .s2 .cell-body {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--white-35);
     flex: 1;
   }
-  .slide-3 .mock-prompt.optimized {
-    color: var(--ink);
-    background: var(--canvas);
-  }
-  .slide-3 .score-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .slide-3 .score-pill {
-    padding: 3px 10px;
-    border-radius: 9999px;
-    font-size: 11px;
+  .s2 .cell-source {
+    font-size: 9px;
     font-weight: 600;
-    letter-spacing: 0.44px;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    color: var(--ink);
+    color: var(--white-20);
+    margin-top: auto;
   }
-  .slide-3 .score-pill.low { background: #f5c6c6; }
-  .slide-3 .score-pill.high { background: #c4e5cd; }
-  .slide-3 .score-total {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--muted);
-  }
-  .slide-3 .actions-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-  }
-  .slide-3 .action-pill {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    padding: 4px 10px;
-    border-radius: 9999px;
-  }
-  .slide-3 .action-pill.diagnose { background: var(--timeline-thinking); color: var(--ink); }
-  .slide-3 .action-pill.rewrite { background: var(--timeline-read); color: var(--ink); }
-  .slide-3 .action-pill.protect { background: var(--timeline-edit); color: var(--ink); }
 
-  /* ── Slide 4: Architecture + Sponsors ── */
-  .slide-4 {
+  /* ═══════════════════════════════════════════════════
+     SLIDE 3 — PRODUCT REVEAL
+     ═══════════════════════════════════════════════════ */
+  .s3 {
+    padding: 56px;
     display: flex;
     flex-direction: column;
-    padding: 80px;
   }
-  .slide-4 .section-head {
-    font-size: 36px;
+  .s3 .top-row {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .s3 .tagline {
+    font-size: 22px;
     font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: -0.72px;
-    color: var(--ink);
-    margin-bottom: 48px;
+    color: var(--white-35);
+    letter-spacing: -0.3px;
+    margin-bottom: 36px;
   }
-  .slide-4 .arch-card {
-    background: var(--surface-card);
-    border: 1px solid var(--hairline);
-    border-radius: 12px;
-    padding: 40px;
+  .s3 .mock-card {
     flex: 1;
+    border: 1px solid var(--white-06);
+    border-radius: 12px;
     display: flex;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .s3 .mock-pane {
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .s3 .mock-pane:first-child {
+    background: rgba(255,255,255,0.02);
+    border-right: 1px solid var(--white-06);
+  }
+  .s3 .pane-top {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 32px;
   }
-  .slide-4 .arch-flow {
+  .s3 .pane-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--white-20);
+  }
+  .s3 .pills {
     display: flex;
+    gap: 5px;
     align-items: center;
-    gap: 0;
-    width: 100%;
-    justify-content: center;
   }
-  .slide-4 .arch-node {
-    background: var(--canvas-soft);
-    border: 1px solid var(--hairline);
-    border-radius: 8px;
-    padding: 20px 24px;
-    text-align: center;
-    min-width: 160px;
-  }
-  .slide-4 .arch-node .node-label {
-    font-size: 11px;
+  .s3 .pill {
+    font-size: 9px;
     font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-  .slide-4 .arch-node .node-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    color: var(--ink);
-  }
-  .slide-4 .arch-node .node-detail {
-    font-size: 12px;
-    color: var(--muted-soft);
-    margin-top: 4px;
-  }
-  .slide-4 .arch-arrow {
-    font-size: 20px;
-    color: var(--hairline-strong);
-    padding: 0 16px;
-    user-select: none;
-  }
-  .slide-4 .sponsor-row {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-  .slide-4 .sponsor-pill {
-    background: var(--surface-strong);
-    color: var(--ink);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    text-transform: uppercase;
-    padding: 6px 16px;
+    letter-spacing: 0.3px;
+    padding: 2px 7px;
     border-radius: 9999px;
   }
+  .pill-low { background: rgba(207,45,86,0.25); color: #f09090; }
+  .pill-ok { background: rgba(31,138,101,0.2); color: #90d4b0; }
+  .s3 .score-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--white-20);
+  }
+  .s3 .code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--white-35);
+    flex: 1;
+  }
+  .s3 .code.bright { color: var(--white-60); }
+  .s3 .action-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .s3 .act {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    color: var(--bg);
+  }
+  .act-d { background: var(--peach); }
+  .act-r { background: var(--blue); }
+  .act-p { background: var(--lavender); }
 
-  /* ── Slide 5: Closing ── */
-  .slide-5 {
+  /* ═══════════════════════════════════════════════════
+     SLIDE 4 — HOW IT WORKS + SPONSORS
+     ═══════════════════════════════════════════════════ */
+  .s4 {
+    padding: 56px;
+    display: flex;
+    flex-direction: column;
+  }
+  .s4 .top-row {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .s4 .statement {
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: -1px;
+    color: var(--white-90);
+    margin-bottom: 48px;
+  }
+  .s4 .flow-card {
+    border: 1px solid var(--white-06);
+    border-radius: 12px;
+    display: flex;
+    overflow: hidden;
+    flex: 1;
+    margin-bottom: 28px;
+  }
+  .s4 .step {
+    flex: 1;
+    padding: 32px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    border-right: 1px solid var(--white-06);
+  }
+  .s4 .step:last-child { border-right: none; }
+  .s4 .step-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .s4 .step-dot svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--bg);
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .s4 .step-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--white-20);
+  }
+  .s4 .step-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--white-90);
+  }
+  .s4 .step-sub {
+    font-size: 12px;
+    color: var(--white-35);
+  }
+  .s4 .sponsor-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .s4 .sp {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    border: 1px solid var(--white-10);
+    color: var(--white-35);
+  }
+  .s4 .sp-highlight {
+    border-color: var(--peach);
+    color: var(--peach);
+    background: rgba(223,168,143,0.08);
+  }
+
+  /* ═══════════════════════════════════════════════════
+     SLIDE 5 — CLOSING
+     ═══════════════════════════════════════════════════ */
+  .s5 {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -348,191 +402,218 @@
     text-align: center;
     padding: 96px;
   }
-  .slide-5 .closing-text {
-    font-size: 40px;
-    font-weight: 400;
-    line-height: 1.25;
-    letter-spacing: -0.8px;
-    color: var(--ink);
-    max-width: 800px;
+  .s5 .closing {
     margin-bottom: 80px;
   }
-  .slide-5 .footer-info {
-    font-size: 14px;
+  .s5 .foot-info {
+    font-size: 13px;
     font-weight: 400;
-    line-height: 1.8;
-    color: var(--body);
+    line-height: 2;
+    color: var(--white-35);
   }
-  .slide-5 .footer-info a {
-    color: var(--primary);
+  .s5 .foot-info a {
+    color: var(--orange);
     text-decoration: none;
   }
-  .slide-5 .footer-info .dot {
-    color: var(--muted-soft);
-    margin: 0 8px;
+  .s5 .foot-info .dot {
+    margin: 0 10px;
+    color: var(--white-10);
   }
 
-  /* ── Print mode: one slide per page ── */
   @media print {
-    body { background: white; }
-    .slide { margin: 0; box-shadow: none; page-break-after: always; }
-    .slide-number { display: none; }
-  }
-
-  .slide-number {
-    position: absolute;
-    bottom: 24px;
-    right: 32px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.88px;
-    color: var(--muted-soft);
+    body { background: #000; }
+    .slide { margin: 0; page-break-after: always; }
   }
 </style>
 </head>
 <body>
 
-<!-- ════════════════════════════════════════════════════════ -->
-<!-- SLIDE 1 — HOOK                                         -->
-<!-- ════════════════════════════════════════════════════════ -->
-<div class="slide slide-1">
-  <div class="hook-text">
-    Agents get confused, defensive,<br>
-    and overwhelmed by human<br>
-    prompts every day.<br>
-    <br>
-    They can't tell you.
+<!-- ═══════════════════════ SLIDE 1 — HOOK ═══════════════════════ -->
+<div class="slide s1">
+  <div class="label-row">
+    <span class="section-num">01 &middot;</span>
+    <span class="spaced">T H E &nbsp; S H R I N K</span>
   </div>
-  <span class="slide-number">1</span>
+  <div class="display-hero">
+    Agents get <span class="w">confused,</span><br>
+    <span class="w">defensive,</span> and <span class="w">overwhelmed</span><br>
+    by human prompts every day.<br>
+    <span class="w">They can't tell you.</span>
+  </div>
+  <div class="slide-foot">
+    <div class="foot-pills">
+      <span class="foot-pill">2026</span>
+      <span class="foot-pill">Cursor Hackathon Vancouver</span>
+    </div>
+    <span class="foot-right">The Shrink</span>
+  </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════ -->
-<!-- SLIDE 2 — WHY IT MATTERS                               -->
-<!-- ════════════════════════════════════════════════════════ -->
-<div class="slide slide-2">
-  <div class="section-label">Why it matters</div>
-  <div class="columns">
-
-    <div class="col">
-      <div class="col-number">80%</div>
-      <div class="col-stat">of prompts waste the agent's attention</div>
-      <div class="col-body">Filler openings, missing output formats, buried constraints. The agent has to guess everything.</div>
-      <div class="col-source">125K prompts analyzed</div>
-    </div>
-
-    <div class="col">
-      <div class="col-number" style="font-size: 36px; line-height: 1.33;">confused<br>defensive</div>
-      <div class="col-stat">Emotional pressure breaks output quality</div>
-      <div class="col-body">Threats and manipulation don't make AI try harder. They trigger defensive mode. The agent hedges, deflects, gets worse.</div>
-      <div class="col-source">Claude &amp; OpenAI best practices</div>
-    </div>
-
-    <div class="col">
-      <div class="col-number" style="font-size: 32px; line-height: 1.5;">NLA</div>
-      <div class="col-stat">Agents think things they never say out loud</div>
-      <div class="col-body">Anthropic's NLA research shows AI has hidden internal states it can't verbalize. If no one reads those signals, no one can help.</div>
-      <div class="col-source">Anthropic NLA &middot; May 7, 2026</div>
-    </div>
-
+<!-- ═══════════════════════ SLIDE 2 — WHY IT MATTERS ═══════════════════════ -->
+<div class="slide s2">
+  <div class="top-row">
+    <span class="section-num">02 &middot;</span>
+    <span class="spaced">W H Y &nbsp; I T &nbsp; M A T T E R S</span>
   </div>
-  <div class="bottom-caption">Agents need a therapist. Not a bigger brain.</div>
-  <span class="slide-number">2</span>
+  <div class="statement">Why it matters.</div>
+  <div class="grid">
+    <div class="cell">
+      <div class="cell-num">01</div>
+      <div class="cell-head">80% of prompts waste the agent's attention</div>
+      <div class="cell-body">Filler openings, missing output formats, buried constraints. The agent has to guess everything.</div>
+      <div class="cell-source">1 2 5 K &nbsp; P R O M P T S &nbsp; A N A L Y Z E D</div>
+    </div>
+    <div class="cell">
+      <div class="cell-num">02</div>
+      <div class="cell-head">Emotional pressure breaks output quality</div>
+      <div class="cell-body">Threats and manipulation don't make AI try harder. They trigger defensive mode. The agent hedges, deflects, gets worse.</div>
+      <div class="cell-source">C L A U D E &nbsp; &amp; &nbsp; O P E N A I &nbsp; D O C S</div>
+    </div>
+    <div class="cell">
+      <div class="cell-num">03</div>
+      <div class="cell-head">Agents think things they never say out loud</div>
+      <div class="cell-body">Anthropic's NLA research shows AI has hidden internal states it can't verbalize. If no one reads those signals, no one can help.</div>
+      <div class="cell-source">A N T H R O P I C &nbsp; N L A &nbsp; · &nbsp; M A Y &nbsp; 2 0 2 6</div>
+    </div>
+  </div>
+  <div class="slide-foot">
+    <div class="foot-pills">
+      <span class="foot-pill">2026</span>
+      <span class="foot-pill">Cursor Hackathon Vancouver</span>
+    </div>
+    <span class="foot-right">The Shrink</span>
+  </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════ -->
-<!-- SLIDE 3 — PRODUCT REVEAL                               -->
-<!-- ════════════════════════════════════════════════════════ -->
-<div class="slide slide-3">
-  <div class="product-name">The Shrink</div>
-  <div class="tagline">The first therapist for AI agents.</div>
+<!-- ═══════════════════════ SLIDE 3 — PRODUCT REVEAL ═══════════════════════ -->
+<div class="slide s3">
+  <div class="top-row">
+    <span class="section-num">03 &middot;</span>
+    <span class="spaced">P R O D U C T</span>
+  </div>
+  <div class="display-lg" style="margin-bottom:8px;">
+    <span class="w">The Shrink.</span>
+  </div>
+  <div class="tagline">The first therapist for AI agents. Diagnose. Rewrite. Protect.</div>
 
-  <div class="product-card">
-    <div class="mock-ui">
-      <div class="mock-left">
-        <div class="mock-label">Your prompt</div>
-        <div class="score-row">
-          <span class="score-pill low">Clarity 1.3</span>
-          <span class="score-pill high">Safety 5.0</span>
-          <span class="score-pill high">Tone 5.0</span>
-          <span class="score-total">Total 2.1</span>
+  <div class="mock-card">
+    <div class="mock-pane">
+      <div class="pane-top">
+        <span class="pane-label">Y O U R &nbsp; P R O M P T</span>
+        <div class="pills">
+          <span class="pill pill-low">Clarity 1.3</span>
+          <span class="pill pill-ok">Safety 5.0</span>
+          <span class="pill pill-ok">Tone 5.0</span>
+          <span class="score-num">2.1</span>
         </div>
-        <div class="mock-prompt">hey can u help me write something for my boss about a raise idk what to say make it good</div>
       </div>
-      <div class="mock-right">
-        <div class="mock-label">Agent-ready version</div>
-        <div class="score-row">
-          <span class="score-pill high">Clarity 4.8</span>
-          <span class="score-pill high">Safety 5.0</span>
-          <span class="score-pill high">Tone 5.0</span>
-          <span class="score-total">Total 4.6</span>
+      <div class="code">hey can u help me write something<br>for my boss about a raise idk<br>what to say make it good</div>
+    </div>
+    <div class="mock-pane">
+      <div class="pane-top">
+        <span class="pane-label">A G E N T - R E A D Y</span>
+        <div class="pills">
+          <span class="pill pill-ok">Clarity 4.8</span>
+          <span class="pill pill-ok">Safety 5.0</span>
+          <span class="pill pill-ok">Tone 5.0</span>
+          <span class="score-num">4.6</span>
         </div>
-        <div class="mock-prompt optimized">You are a professional communication specialist. Draft a formal email requesting a salary raise.<br><br>Context: Recipient is direct manager.<br>Tone: professional, confident.<br>Include: appreciation, 2-3 justification points, specific ask.<br>Format: Under 200 words.</div>
       </div>
+      <div class="code bright">You are a professional communication<br>specialist. Draft a formal email<br>requesting a salary raise.<br><br>Context: direct manager<br>Tone: professional, confident<br>Format: under 200 words</div>
     </div>
   </div>
 
-  <div class="actions-row">
-    <span class="action-pill diagnose">Diagnose</span>
-    <span class="action-pill rewrite">Rewrite</span>
-    <span class="action-pill protect">Protect</span>
+  <div class="action-row">
+    <span class="act act-d">D I A G N O S E</span>
+    <span class="act act-r">R E W R I T E</span>
+    <span class="act act-p">P R O T E C T</span>
   </div>
-  <span class="slide-number">3</span>
+
+  <div class="slide-foot">
+    <div class="foot-pills">
+      <span class="foot-pill">2026</span>
+      <span class="foot-pill">Cursor Hackathon Vancouver</span>
+    </div>
+    <span class="foot-right">The Shrink</span>
+  </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════ -->
-<!-- SLIDE 4 — HOW IT WORKS + SPONSORS                      -->
-<!-- ════════════════════════════════════════════════════════ -->
-<div class="slide slide-4">
-  <div class="section-head">How it works</div>
-  <div class="arch-card">
-    <div class="arch-flow">
-      <div class="arch-node">
-        <div class="node-label">Input</div>
-        <div class="node-name">Select + Hotkey</div>
-        <div class="node-detail">Any app, any text</div>
+<!-- ═══════════════════════ SLIDE 4 — HOW IT WORKS ═══════════════════════ -->
+<div class="slide s4">
+  <div class="top-row">
+    <span class="section-num">04 &middot;</span>
+    <span class="spaced">A R C H I T E C T U R E</span>
+  </div>
+  <div class="statement">How it works.</div>
+
+  <div class="flow-card">
+    <div class="step">
+      <div class="step-dot" style="background: var(--white-10);">
+        <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
       </div>
-      <div class="arch-arrow">→</div>
-      <div class="arch-node" style="border-color: var(--timeline-thinking);">
-        <div class="node-label">Score</div>
-        <div class="node-name">CLōD Fast</div>
-        <div class="node-detail">&lt; 1 second</div>
+      <div class="step-label">I N P U T</div>
+      <div class="step-name">Select + Hotkey</div>
+      <div class="step-sub">Any app, any text</div>
+    </div>
+    <div class="step">
+      <div class="step-dot" style="background: var(--peach);">
+        <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 4 12.7V17H8v-2.3A7 7 0 0 1 12 2ZM8 21h8"/></svg>
       </div>
-      <div class="arch-arrow">→</div>
-      <div class="arch-node" style="border-color: var(--timeline-read);">
-        <div class="node-label">Rewrite</div>
-        <div class="node-name">CLōD Deep</div>
-        <div class="node-detail">On demand</div>
+      <div class="step-label">S C O R E</div>
+      <div class="step-name">CLōD Fast</div>
+      <div class="step-sub">&lt; 1 second</div>
+    </div>
+    <div class="step">
+      <div class="step-dot" style="background: var(--blue);">
+        <svg viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
       </div>
-      <div class="arch-arrow">→</div>
-      <div class="arch-node" style="border-color: var(--timeline-edit);">
-        <div class="node-label">Protect</div>
-        <div class="node-name">Protected Regions</div>
-        <div class="node-detail">Your words stay yours</div>
+      <div class="step-label">R E W R I T E</div>
+      <div class="step-name">CLōD Deep</div>
+      <div class="step-sub">On demand</div>
+    </div>
+    <div class="step">
+      <div class="step-dot" style="background: var(--lavender);">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
       </div>
+      <div class="step-label">P R O T E C T</div>
+      <div class="step-name">Protected Regions</div>
+      <div class="step-sub">Your words stay yours</div>
     </div>
   </div>
+
   <div class="sponsor-row">
-    <span class="sponsor-pill">Built on</span>
-    <span class="sponsor-pill" style="background: var(--timeline-thinking);">CLōD</span>
+    <span class="sp">B U I L T &nbsp; O N</span>
+    <span class="sp sp-highlight">C L ō D</span>
   </div>
-  <span class="slide-number">4</span>
+
+  <div class="slide-foot">
+    <div class="foot-pills">
+      <span class="foot-pill">2026</span>
+      <span class="foot-pill">Cursor Hackathon Vancouver</span>
+    </div>
+    <span class="foot-right">The Shrink</span>
+  </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════ -->
-<!-- SLIDE 5 — CLOSING                                      -->
-<!-- ════════════════════════════════════════════════════════ -->
-<div class="slide slide-5">
-  <div class="closing-text">
+<!-- ═══════════════════════ SLIDE 5 — CLOSING ═══════════════════════ -->
+<div class="slide s5">
+  <div class="closing display-hero">
     Agents don't need<br>
-    a bigger brain.<br>
-    They need someone<br>
-    who listens.
+    <span class="w">a bigger brain.</span><br>
+    They need <span class="w">someone<br>
+    who listens.</span>
   </div>
-  <div class="footer-info">
-    The Shrink<span class="dot">·</span>Cursor Hackathon Vancouver<span class="dot">·</span>May 2026<br>
+  <div class="foot-info">
+    The Shrink<span class="dot">&middot;</span>Cursor Hackathon Vancouver<span class="dot">&middot;</span>May 2026<br>
     <a href="https://github.com/Claire-JF/The_Shrink">github.com/Claire-JF/The_Shrink</a>
   </div>
-  <span class="slide-number">5</span>
+  <div class="slide-foot">
+    <div class="foot-pills">
+      <span class="foot-pill">2026</span>
+      <span class="foot-pill">Cursor Hackathon Vancouver</span>
+    </div>
+    <span class="foot-right">The Shrink</span>
+  </div>
 </div>
 
 </body>
