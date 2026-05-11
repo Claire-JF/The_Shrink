@@ -689,8 +689,19 @@ function renderCompactMetrics(scoreData, target = elements.metricStrip) {
 // Click a protected span → removes protection.
 // Safety < 2.0 → all protections auto-cleared.
 
-function renderOriginalPrompt(text) {
-  elements.originalField.textContent = text || "";
+/**
+ * @param {string} text
+ * @param {{ force?: boolean }} [opts] force=true replaces DOM (e.g. fresh panel). Default skips replace when plain text unchanged so .protected-span nodes stay intact.
+ */
+function renderOriginalPrompt(text, opts = {}) {
+  const t = text || "";
+  const force = opts.force === true;
+  const plain = elements.originalField.textContent || "";
+  if (!force && plain === t) {
+    elements.originalSection.classList.remove("is-hidden");
+    return;
+  }
+  elements.originalField.textContent = t;
   elements.originalSection.classList.remove("is-hidden");
 }
 
@@ -766,7 +777,7 @@ function renderIssuesPanel(scoreData) {
 
   // Show original prompt. Auto-clear protections if safety < 2.
   const promptText = state.originalPrompt || "";
-  renderOriginalPrompt(promptText);
+  renderOriginalPrompt(promptText, { force: true });
   if (scoreData.safety < 2.0) clearAllProtections();
 }
 
