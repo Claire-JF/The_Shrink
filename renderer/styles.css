@@ -33,11 +33,18 @@ body {
 }
 
 html {
-  /* visible: radial score petals + bubble extend outside the cat; hidden clips hover UI */
-  overflow: visible;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 body {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  /* replaces .shell margin — avoids document overflow scrollbars */
+  padding: 8px;
   min-height: 0;
 }
 
@@ -56,7 +63,7 @@ button {
 
 .shell {
   position: relative;
-  margin: 8px;
+  margin: 0;
   box-sizing: border-box;
 }
 
@@ -332,8 +339,15 @@ body.mode-cat .panel__close {
   min-height: 0;
   padding: 15px 15px 16px;
   overflow-y: auto;
-  /* Scroll inside panel; outer window grows via ResizeObserver (avoid 100vh trap on small shells) */
-  max-height: 520px;
+  /* Tall flows rely on window resize; wheel scrolling stays usable without visible bar */
+  max-height: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.panel__content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .panel__topline {
@@ -613,7 +627,7 @@ body.phase-optimized .panel__hero {
 .editor-section__textarea {
   width: 100%;
   min-height: 126px;
-  resize: vertical;
+  resize: none;
   padding: 10px 11px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 5px;
@@ -622,6 +636,13 @@ body.phase-optimized .panel__hero {
   font-size: 11px;
   line-height: 1.45;
   outline: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.editor-section__textarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .editor-section__textarea:focus {
