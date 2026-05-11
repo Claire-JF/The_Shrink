@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Shrink — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #f54e00;
+    --primary-active: #d04200;
+    --ink: #26251e;
+    --body: #5a5852;
+    --muted: #807d72;
+    --muted-soft: #a09c92;
+    --hairline: #e6e5e0;
+    --hairline-soft: #efeee8;
+    --hairline-strong: #cfcdc4;
+    --canvas: #f7f7f4;
+    --canvas-soft: #fafaf7;
+    --surface-card: #ffffff;
+    --surface-strong: #e6e5e0;
+    --on-primary: #ffffff;
+    --timeline-thinking: #dfa88f;
+    --timeline-grep: #9fc9a2;
+    --timeline-read: #9fbbe0;
+    --timeline-edit: #c0a8dd;
+    --timeline-done: #c08532;
+    --error: #cf2d56;
+    --success: #1f8a65;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #1a1a1a;
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+
+  .slide {
+    width: 1280px;
+    height: 720px;
+    background: var(--canvas);
+    margin: 40px auto;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+  }
+
+  /* ── Slide 1: Hook ── */
+  .slide-1 {
+    display: flex;
+    align-items: flex-start;
+    padding: 80px;
+  }
+  .slide-1 .hook-text {
+    font-size: 54px;
+    font-weight: 400;
+    line-height: 1.12;
+    letter-spacing: -1.62px;
+    color: var(--ink);
+    max-width: 1000px;
+  }
+
+  /* ── Slide 2: Why It Matters ── */
+  .slide-2 {
+    display: flex;
+    flex-direction: column;
+    padding: 80px;
+    justify-content: space-between;
+  }
+  .slide-2 .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 48px;
+  }
+  .slide-2 .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 32px;
+    flex: 1;
+  }
+  .slide-2 .col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .slide-2 .col-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--hairline-strong);
+  }
+  .slide-2 .col-stat {
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.56px;
+    color: var(--ink);
+  }
+  .slide-2 .col-body {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--body);
+    max-width: 340px;
+  }
+  .slide-2 .col-source {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    color: var(--muted-soft);
+    margin-top: auto;
+  }
+  .slide-2 .bottom-caption {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    padding-top: 40px;
+    border-top: 1px solid var(--hairline);
+  }
+
+  /* ── Slide 3: Product Reveal ── */
+  .slide-3 {
+    display: flex;
+    flex-direction: column;
+    padding: 80px;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .slide-3 .product-name {
+    font-size: 56px;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -1.68px;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+  .slide-3 .tagline {
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: -0.3px;
+    color: var(--body);
+    margin-bottom: 48px;
+  }
+  .slide-3 .product-card {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    width: 880px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide-3 .product-card .placeholder {
+    font-size: 14px;
+    color: var(--muted-soft);
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .slide-3 .product-card .mock-ui {
+    display: flex;
+    width: 100%;
+    height: 100%;
+  }
+  .slide-3 .mock-left,
+  .slide-3 .mock-right {
+    flex: 1;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .slide-3 .mock-left {
+    background: var(--canvas-soft);
+    border-right: 1px solid var(--hairline);
+    border-radius: 12px 0 0 12px;
+  }
+  .slide-3 .mock-right {
+    border-radius: 0 12px 12px 0;
+  }
+  .slide-3 .mock-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .slide-3 .mock-prompt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--body);
+    background: var(--canvas);
+    border-radius: 8px;
+    padding: 14px;
+    flex: 1;
+  }
+  .slide-3 .mock-prompt.optimized {
+    color: var(--ink);
+    background: var(--canvas);
+  }
+  .slide-3 .score-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .slide-3 .score-pill {
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.44px;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .slide-3 .score-pill.low { background: #f5c6c6; }
+  .slide-3 .score-pill.high { background: #c4e5cd; }
+  .slide-3 .score-total {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .slide-3 .actions-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .slide-3 .action-pill {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 9999px;
+  }
+  .slide-3 .action-pill.diagnose { background: var(--timeline-thinking); color: var(--ink); }
+  .slide-3 .action-pill.rewrite { background: var(--timeline-read); color: var(--ink); }
+  .slide-3 .action-pill.protect { background: var(--timeline-edit); color: var(--ink); }
+
+  /* ── Slide 4: Architecture + Sponsors ── */
+  .slide-4 {
+    display: flex;
+    flex-direction: column;
+    padding: 80px;
+  }
+  .slide-4 .section-head {
+    font-size: 36px;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.72px;
+    color: var(--ink);
+    margin-bottom: 48px;
+  }
+  .slide-4 .arch-card {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 40px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+  .slide-4 .arch-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    justify-content: center;
+  }
+  .slide-4 .arch-node {
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 20px 24px;
+    text-align: center;
+    min-width: 160px;
+  }
+  .slide-4 .arch-node .node-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .slide-4 .arch-node .node-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .slide-4 .arch-node .node-detail {
+    font-size: 12px;
+    color: var(--muted-soft);
+    margin-top: 4px;
+  }
+  .slide-4 .arch-arrow {
+    font-size: 20px;
+    color: var(--hairline-strong);
+    padding: 0 16px;
+    user-select: none;
+  }
+  .slide-4 .sponsor-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  .slide-4 .sponsor-pill {
+    background: var(--surface-strong);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 9999px;
+  }
+
+  /* ── Slide 5: Closing ── */
+  .slide-5 {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 96px;
+  }
+  .slide-5 .closing-text {
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 1.25;
+    letter-spacing: -0.8px;
+    color: var(--ink);
+    max-width: 800px;
+    margin-bottom: 80px;
+  }
+  .slide-5 .footer-info {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.8;
+    color: var(--body);
+  }
+  .slide-5 .footer-info a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  .slide-5 .footer-info .dot {
+    color: var(--muted-soft);
+    margin: 0 8px;
+  }
+
+  /* ── Print mode: one slide per page ── */
+  @media print {
+    body { background: white; }
+    .slide { margin: 0; box-shadow: none; page-break-after: always; }
+    .slide-number { display: none; }
+  }
+
+  .slide-number {
+    position: absolute;
+    bottom: 24px;
+    right: 32px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.88px;
+    color: var(--muted-soft);
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — HOOK                                         -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="slide slide-1">
+  <div class="hook-text">
+    Agents get confused, defensive,<br>
+    and overwhelmed by human<br>
+    prompts every day.<br>
+    <br>
+    They can't tell you.
+  </div>
+  <span class="slide-number">1</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — WHY IT MATTERS                               -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="slide slide-2">
+  <div class="section-label">Why it matters</div>
+  <div class="columns">
+
+    <div class="col">
+      <div class="col-number">80%</div>
+      <div class="col-stat">of prompts waste the agent's attention</div>
+      <div class="col-body">Filler openings, missing output formats, buried constraints. The agent has to guess everything.</div>
+      <div class="col-source">125K prompts analyzed</div>
+    </div>
+
+    <div class="col">
+      <div class="col-number" style="font-size: 36px; line-height: 1.33;">confused<br>defensive</div>
+      <div class="col-stat">Emotional pressure breaks output quality</div>
+      <div class="col-body">Threats and manipulation don't make AI try harder. They trigger defensive mode. The agent hedges, deflects, gets worse.</div>
+      <div class="col-source">Claude &amp; OpenAI best practices</div>
+    </div>
+
+    <div class="col">
+      <div class="col-number" style="font-size: 32px; line-height: 1.5;">NLA</div>
+      <div class="col-stat">Agents think things they never say out loud</div>
+      <div class="col-body">Anthropic's NLA research shows AI has hidden internal states it can't verbalize. If no one reads those signals, no one can help.</div>
+      <div class="col-source">Anthropic NLA &middot; May 7, 2026</div>
+    </div>
+
+  </div>
+  <div class="bottom-caption">Agents need a therapist. Not a bigger brain.</div>
+  <span class="slide-number">2</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — PRODUCT REVEAL                               -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="slide slide-3">
+  <div class="product-name">The Shrink</div>
+  <div class="tagline">The first therapist for AI agents.</div>
+
+  <div class="product-card">
+    <div class="mock-ui">
+      <div class="mock-left">
+        <div class="mock-label">Your prompt</div>
+        <div class="score-row">
+          <span class="score-pill low">Clarity 1.3</span>
+          <span class="score-pill high">Safety 5.0</span>
+          <span class="score-pill high">Tone 5.0</span>
+          <span class="score-total">Total 2.1</span>
+        </div>
+        <div class="mock-prompt">hey can u help me write something for my boss about a raise idk what to say make it good</div>
+      </div>
+      <div class="mock-right">
+        <div class="mock-label">Agent-ready version</div>
+        <div class="score-row">
+          <span class="score-pill high">Clarity 4.8</span>
+          <span class="score-pill high">Safety 5.0</span>
+          <span class="score-pill high">Tone 5.0</span>
+          <span class="score-total">Total 4.6</span>
+        </div>
+        <div class="mock-prompt optimized">You are a professional communication specialist. Draft a formal email requesting a salary raise.<br><br>Context: Recipient is direct manager.<br>Tone: professional, confident.<br>Include: appreciation, 2-3 justification points, specific ask.<br>Format: Under 200 words.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions-row">
+    <span class="action-pill diagnose">Diagnose</span>
+    <span class="action-pill rewrite">Rewrite</span>
+    <span class="action-pill protect">Protect</span>
+  </div>
+  <span class="slide-number">3</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — HOW IT WORKS + SPONSORS                      -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="slide slide-4">
+  <div class="section-head">How it works</div>
+  <div class="arch-card">
+    <div class="arch-flow">
+      <div class="arch-node">
+        <div class="node-label">Input</div>
+        <div class="node-name">Select + Hotkey</div>
+        <div class="node-detail">Any app, any text</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node" style="border-color: var(--timeline-thinking);">
+        <div class="node-label">Score</div>
+        <div class="node-name">CLōD Fast</div>
+        <div class="node-detail">&lt; 1 second</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node" style="border-color: var(--timeline-read);">
+        <div class="node-label">Rewrite</div>
+        <div class="node-name">CLōD Deep</div>
+        <div class="node-detail">On demand</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node" style="border-color: var(--timeline-edit);">
+        <div class="node-label">Protect</div>
+        <div class="node-name">Protected Regions</div>
+        <div class="node-detail">Your words stay yours</div>
+      </div>
+    </div>
+  </div>
+  <div class="sponsor-row">
+    <span class="sponsor-pill">Built on</span>
+    <span class="sponsor-pill" style="background: var(--timeline-thinking);">CLōD</span>
+  </div>
+  <span class="slide-number">4</span>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — CLOSING                                      -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="slide slide-5">
+  <div class="closing-text">
+    Agents don't need<br>
+    a bigger brain.<br>
+    They need someone<br>
+    who listens.
+  </div>
+  <div class="footer-info">
+    The Shrink<span class="dot">·</span>Cursor Hackathon Vancouver<span class="dot">·</span>May 2026<br>
+    <a href="https://github.com/Claire-JF/The_Shrink">github.com/Claire-JF/The_Shrink</a>
+  </div>
+  <span class="slide-number">5</span>
+</div>
+
+</body>
+</html>
