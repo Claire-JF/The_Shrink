@@ -199,6 +199,7 @@ function setMode(mode) {
     setBubbleVisible(false);
     resetBubbleTimer();
   }
+  lastOrbDimensions = { w: 0, h: 0 };
   scheduleSyncOrbWindow();
   /* Panel layout settles after two frames — remeasure so the OS window fits full chrome */
   requestAnimationFrame(() => {
@@ -246,12 +247,16 @@ function updatePet(scoreData) {
     elements.catFace.classList.add("cat--loading");
     setCatImage("pending");
     elements.petBubble.textContent = "Reading selection…";
+    elements.petBubble.classList.add("is-visible");
+    elements.petBubble.setAttribute("aria-hidden", "false");
     return;
   }
   if (state.captureLoading === "score") {
     elements.catFace.classList.add("cat--loading");
     setCatImage("confused");
     elements.petBubble.textContent = "Scoring…";
+    elements.petBubble.classList.add("is-visible");
+    elements.petBubble.setAttribute("aria-hidden", "false");
     return;
   }
 
@@ -312,6 +317,8 @@ function clamp(value, min, max) {
 }
 
 let syncOrbTimer = null;
+/** Avoid ResizeObserver ↔ setBounds feedback jitter */
+let lastOrbDimensions = { w: 0, h: 0 };
 
 function scheduleSyncOrbWindow() {
   if (typeof shrink === "undefined" || typeof shrink.syncOrbContentSize !== "function") {
@@ -325,12 +332,20 @@ function scheduleSyncOrbWindow() {
     /* Absolute-positioned cat does not always inflate offsetHeight — use scroll + bounding box. */
     const w = Math.ceil(Math.max(el.offsetWidth, el.scrollWidth, br.width));
     const h = Math.ceil(Math.max(el.offsetHeight, el.scrollHeight, br.height));
+    if (
+      Math.abs(w - lastOrbDimensions.w) < 3 &&
+      Math.abs(h - lastOrbDimensions.h) < 3 &&
+      (lastOrbDimensions.w > 0 || lastOrbDimensions.h > 0)
+    ) {
+      return;
+    }
+    lastOrbDimensions = { w, h };
     shrink.syncOrbContentSize({
       width: Math.max(w, 1),
       height: Math.max(h, 1),
       keepTopRight: true,
     });
-  }, 48);
+  }, 120);
 }
 
 function buildIssueSections(scoreData) {
@@ -426,9 +441,13 @@ function buildPetalsSVG(scoreData) {
     );
   });
 
+  /* Non-zero dimensions + viewBox — width="0" height="0" prevented petals painting in Chromium */
+  const VB = 140;
+  const SZ = VB * 2;
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" ` +
-    `style="overflow:visible;position:absolute;left:0;top:0" width="0" height="0" aria-hidden="true">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${SZ}" height="${SZ}" ` +
+    `viewBox="-${VB} -${VB} ${SZ} ${SZ}" ` +
+    `style="overflow:visible;position:absolute;left:-${VB}px;top:-${VB}px;pointer-events:none" aria-hidden="true">` +
     `<defs>${clipDefs}</defs>` +
     parts.join("") +
     `</svg>`

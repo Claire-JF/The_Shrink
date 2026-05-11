@@ -14,6 +14,10 @@ const {
   scoreCapturedText,
 } = require('./ipc');
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Deliver renderer payload once webContents can receive IPC, then reveal the hover window.
  * Returns a Promise that settles after the first IPC send is scheduled (after load if needed).
@@ -63,6 +67,9 @@ async function onShrinkHotkey(forced) {
     { activate: false },
   );
 
+  /* Let the renderer paint loading UI before capture/scoring complete */
+  await sleep(140);
+
   let partial;
   try {
     partial = await runCaptureSelectionPhase({ forced });
@@ -97,6 +104,7 @@ async function onShrinkHotkey(forced) {
         sourceApp: partial.sourceApp,
       },
     });
+    await sleep(120);
   }
 
   const scoreResult = await scoreCapturedText(partial.capturedText);
