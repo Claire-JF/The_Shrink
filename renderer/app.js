@@ -79,6 +79,13 @@ function collectProtectedRegionsFromOriginal() {
   return normalizeRegions(raw, plain.length);
 }
 
+/** Ignore the click that arrives right after a successful drag-to-protect (same gesture). */
+let suppressNextProtectUnwrapClick = false;
+
+/** Tracks pointer movement inside «Your prompt» for UX (helps detect drag vs tap). */
+let originalFieldDragging = false;
+let originalFieldDragStart = null;
+
 const state = {
   mode: "cat",
   phase: "issues",
@@ -712,6 +719,7 @@ function hideOriginalPrompt() {
 
 function unwrapSpan(span) {
   const parent = span.parentNode;
+  if (!parent) return;
   while (span.firstChild) parent.insertBefore(span.firstChild, span);
   span.remove();
   parent.normalize();
@@ -719,6 +727,47 @@ function unwrapSpan(span) {
 
 function clearAllProtections() {
   elements.originalField.querySelectorAll(".protected-span").forEach(unwrapSpan);
+}
+
+/**
+ * Wrap current range in `.protected-span`. Uses surroundContents first; falls back to extractContents
+ * when the selection crosses node boundaries (common with wrapping text / existing spans).
+ */
+function wrapProtectedRange(range) {
+  const span = document.createElement("span");
+  span.className = "protected-span";
+  span.title = "Protected — click to remove";
+  try {
+    range.surroundContents(span);
+    return true;
+  } catch {
+    try {
+      const frag = range.extractContents();
+      if (!frag || !frag.textContent || !frag.textContent.trim()) {
+        return false;
+      }
+      span.appendChild(frag);
+      range.insertNode(span);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function handleOriginalPointerDown(event) {
+  if (event.button !== 0) return;
+  if (elements.originalSection.classList.contains("is-hidden")) return;
+  originalFieldDragStart = { x: event.clientX, y: event.clientY };
+  originalFieldDragging = false;
+}
+
+function handleOriginalPointerMove(event) {
+  if (elements.originalSection.classList.contains("is-hidden")) return;
+  if (!originalFieldDragStart || (event.buttons & 1) !== 1) return;
+  const dx = event.clientX - originalFieldDragStart.x;
+  const dy = event.clientY - originalFieldDragStart.y;
+  if (Math.hypot(dx, dy) > 6) originalFieldDragging = true;
 }
 
 function handleOriginalMouseUp() {
@@ -730,25 +779,32 @@ function handleOriginalMouseUp() {
   // Safety guard: if safety < 2, refuse to add protection
   if (state.score && state.score.safety < 2.0) {
     sel.removeAllRanges();
+    originalFieldDragging = false;
+    originalFieldDragStart = null;
     return;
   }
 
-  const span = document.createElement("span");
-  span.className = "protected-span";
-  span.title = "Protected — click to remove";
-  try {
-    range.surroundContents(span);
-  } catch {
-    // Selection crosses element boundaries (e.g. existing span edge) — skip
-    sel.removeAllRanges();
-    return;
-  }
+  const hadText = !!(range.toString() && range.toString().length > 0);
+  const ok = wrapProtectedRange(range);
   sel.removeAllRanges();
+  originalFieldDragStart = null;
+  /*
+   * After surroundContents/extractWrap, Chromium dispatches click on/near the new span —
+   * our click handler must not unwrap immediately. Covers tiny drags as well (<6px pointer move).
+   */
+  suppressNextProtectUnwrapClick = !!(ok && (originalFieldDragging || hadText));
+  originalFieldDragging = false;
 }
 
 function handleOriginalClick(event) {
+  if (suppressNextProtectUnwrapClick) {
+    suppressNextProtectUnwrapClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   const span = event.target.closest(".protected-span");
-  if (!span) return;
+  if (!span || !elements.originalField.contains(span)) return;
   unwrapSpan(span);
 }
 
@@ -1096,8 +1152,14 @@ function init() {
 
   elements.petBubble.addEventListener("click", openPanel);
   elements.petalTip.addEventListener("click", () => { hidePetalTip(); openPanel(); });
+  elements.originalField.addEventListener("pointerdown", handleOriginalPointerDown);
+  elements.originalField.addEventListener("pointermove", handleOriginalPointerMove);
   elements.originalField.addEventListener("mouseup", handleOriginalMouseUp);
-  elements.originalField.addEventListener("click", handleOriginalClick);
+  elements.originalField.addEventListener(
+    "click",
+    handleOriginalClick,
+    { capture: true },
+  );
   elements.catWrap.addEventListener("pointerdown", handleCatPointerDown);
   elements.catWrap.addEventListener("pointermove", handleCatPointerMove);
   elements.catWrap.addEventListener("pointerup", handleCatPointerUp);
